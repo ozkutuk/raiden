@@ -20,7 +20,29 @@ struct Color {
     uint8_t b;
 };
 
+struct Sphere {
+    tmath::vec3f center;
+    float radius;
+};
+
+bool hit_sphere(const Sphere &sphere, const Ray &ray) {
+    float a = tmath::dot(ray.direction, ray.direction);
+    tmath::vec3f o_minus_c = ray.origin - sphere.center;
+    float b = 2 * tmath::dot(o_minus_c, ray.direction);
+    float c = tmath::dot(o_minus_c, o_minus_c) - sphere.radius * sphere.radius;
+
+    float discriminant = b * b - 4 * a * c;
+    return discriminant > 0;
+}
+
 tmath::vec3f color(const Ray &ray) {
+    Sphere sphere;
+    sphere.center = tmath::vec3f(0.0f, 0.0f, -1.0f);
+    sphere.radius = 0.5f;
+
+    if (hit_sphere(sphere, ray))
+        return tmath::vec3f(1.0f, 0.0f, 0.0f);
+
     tmath::vec3f unit = tmath::normalize(ray.direction);
     float t = 0.5f * (unit.y + 1.0f);
     tmath::vec3f white = tmath::vec3f(1.0f, 1.0f, 1.0f);
@@ -30,8 +52,8 @@ tmath::vec3f color(const Ray &ray) {
 }
 
 int main(void) {
-    constexpr int image_width = 200;
-    constexpr int image_height = 100;
+    constexpr int image_width = 1024;
+    constexpr int image_height = 512;
 
     // assume camera is at 0,0,0
     tmath::vec3f origin(0.0f, 0.0f, 0.0f);
