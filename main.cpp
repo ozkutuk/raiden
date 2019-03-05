@@ -11,31 +11,52 @@
 #include <cstdint>
 #include <vector>
 
-// TODO: enforce 4-byte alignment
+#include "ray.h"
+#include "tinymath.h"
+
 struct Color {
-  uint8_t r;
-  uint8_t g;
-  uint8_t b;
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
 };
 
-int main(void) {
-  constexpr int width = 1280;
-  constexpr int height = 720;
+tmath::vec3f color(const Ray &ray) {
+    tmath::vec3f unit = tmath::normalize(ray.direction);
+    float t = 0.5f * (unit.y + 1.0f);
+    tmath::vec3f white = tmath::vec3f(1.0f, 1.0f, 1.0f);
+    tmath::vec3f blue = tmath::vec3f(0.5f, 0.7f, 1.0f);
 
-  std::vector<Color> image(width * height);
-  for (int y = 0; y < height; y++) {
-    for (int x = 0; x < width; x++) {
-      double s = static_cast<double>(x) / width;
-      s = static_cast<uint8_t>(s * 255);
-      double t = static_cast<double>(y) / height;
-      t = static_cast<uint8_t>(t * 255);
-      Color c;
-      c.r = s;
-      c.g = t;
-      image[y * width + x] = c;
+    return (1.0f - t) * white + t * blue;
+}
+
+int main(void) {
+    constexpr int image_width = 200;
+    constexpr int image_height = 100;
+
+    // assume camera is at 0,0,0
+    tmath::vec3f origin(0.0f, 0.0f, 0.0f);
+    tmath::vec3f top_left(-2.0f, 1.0f, -1.0f);
+    tmath::vec3f horizontal(4.0f, 0.0f, 0.0f);
+    tmath::vec3f vertical(0.0f, -2.0f, 0.0f);
+    tmath::vec3f u = horizontal / image_width;
+    tmath::vec3f v = vertical / image_height;
+
+    std::vector<Color> image(image_width * image_height);
+
+    for (int y = 0; y < image_height; y++) {
+        for (int x = 0; x < image_width; x++) {
+            Ray r(origin, top_left + x * u + y * v);
+            tmath::vec3f value = color(r);
+            Color c;
+            c.r = static_cast<uint8_t>(value.x * 255.99f);
+            c.g = static_cast<uint8_t>(value.y * 255.99f);
+            c.b = static_cast<uint8_t>(value.z * 255.99f);
+
+            image[y * image_width + x] = c;
+        }
     }
-  }
-  stbi_write_png("out.png", width, height, 3, image.data(),
-                 width * sizeof(Color));
-  return EXIT_SUCCESS;
+
+    stbi_write_png("out.png", image_width, image_height, 3, image.data(),
+                   image_width * sizeof(Color));
+    return EXIT_SUCCESS;
 }

@@ -2,5 +2,6 @@
 BasedOnStyle: LLVM
 AllowShortBlocksOnASingleLine: 'false'  
 AllowShortFunctionsOnASingleLine: None
+IndentWidth: '4'
 
 ...
