@@ -110,4 +110,15 @@ vec3f cross(const vec3f &lhs, const vec3f &rhs) {
     return result;
 }
 
+vec3f reflect(const vec3f &incident, const vec3f &normal) {
+    return incident - 2.0f * normal * dot(incident, normal);
+}
+
+vec3f clamp(vec3f v, float min_value, float max_value) {
+    v.x = std::min(std::max(v.x, min_value), max_value);
+    v.y = std::min(std::max(v.y, min_value), max_value);
+    v.z = std::min(std::max(v.z, min_value), max_value);
+    return v;
+}
+
 } // namespace tmath

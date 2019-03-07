@@ -41,5 +41,7 @@ float length(const vec3f &vec);
 vec3f normalize(vec3f vec);
 float dot(const vec3f &lhs, const vec3f &rhs);
 vec3f cross(const vec3f &lhs, const vec3f &rhs);
+vec3f reflect(const vec3f &incident, const vec3f &normal);
+vec3f clamp(vec3f v, float min_value, float max_value);
 
 } // namespace tmath
