@@ -55,7 +55,8 @@ HitRecord scene_hit(const Ray &ray, const std::vector<Sphere> &spheres) {
 }
 
 tmath::vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres,
-                      const std::vector<Light> &lights, const tmath::vec3f &ambient_light) {
+                      const std::vector<Light> &lights, const tmath::vec3f &ambient_light,
+                      int recursion_depth) {
 
     HitRecord hit = scene_hit(ray, spheres);
     if (!hit.sphere) {
@@ -73,6 +74,7 @@ tmath::vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres,
     tmath::vec3f specular_light_intensity(0.0f, 0.0f, 0.0f);
     tmath::vec3f hit_point = ray.at(hit.t);
     tmath::vec3f normal = tmath::normalize(hit_point - hit.sphere->center);
+    tmath::vec3f to_eye = tmath::normalize(ray.origin - hit_point);
     for (const auto &light : lights) {
         tmath::vec3f light_vec = light.position - hit_point;
         float light_distance = tmath::length(light_vec);
@@ -90,7 +92,6 @@ tmath::vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres,
                                    (light_distance * light_distance);
 
         // NOTE: this may be calculated without half vector
-        tmath::vec3f to_eye = tmath::normalize(ray.origin - hit_point);
         tmath::vec3f half = tmath::normalize(light_dir + to_eye);
         float nh_angle = std::max(0.0f, tmath::dot(normal, half));
         specular_light_intensity += light.intensity *
@@ -98,8 +99,17 @@ tmath::vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres,
                                     (light_distance * light_distance);
     }
 
-    total_light =  hit.sphere->material.diffuse * diffuse_light_intensity +
-           hit.sphere->material.specular * specular_light_intensity;
+    total_light = hit.sphere->material.diffuse * diffuse_light_intensity +
+                  hit.sphere->material.specular * specular_light_intensity;
+
+    if (tmath::length(hit.sphere->material.mirror_reflectance) != 0 && recursion_depth > 0) {
+        Ray reflected(hit_point + 1e-3 * normal, tmath::reflect(-1.0f * to_eye, normal));
+        // TODO: get rid of this awful re-calculation
+        if (scene_hit(reflected, spheres).sphere)
+            total_light += hit.sphere->material.mirror_reflectance *
+                           cast_ray(reflected, spheres, lights, ambient_light, recursion_depth - 1);
+    }
+
     return total_light;
 }
 
@@ -131,8 +141,9 @@ void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights
             float sv = (tb * (y + 0.5f)) / image_height;
 
             Ray r(origin, (top_left + su * right - sv * camera.up) - origin);
+            // TODO: get recursion depth from xml
             tmath::vec3f value =
-                tmath::clamp(cast_ray(r, spheres, lights, ambient_light), 0.0f, 255.0f);
+                tmath::clamp(cast_ray(r, spheres, lights, ambient_light, 6), 0.0f, 255.0f);
             Color c;
             c.r = static_cast<uint8_t>(value.x);
             c.g = static_cast<uint8_t>(value.y);
@@ -162,6 +173,7 @@ int main(int argc, char **argv) {
         Material m(scene.materials[sphere.material_id - 1].diffuse,
                    scene.materials[sphere.material_id - 1].specular,
                    scene.materials[sphere.material_id - 1].ambient,
+                   scene.materials[sphere.material_id - 1].mirror,
                    scene.materials[sphere.material_id - 1].phong_exponent);
         Sphere s(scene.vertex_data[sphere.center_vertex_id - 1], sphere.radius, m);
         spheres.emplace_back(s);
@@ -175,6 +187,7 @@ int main(int argc, char **argv) {
         lights.emplace_back(l);
     }
 
+    // TODO: render for each camera in xml
     render(spheres, lights, scene.ambient_light, scene.cameras[0]);
     return EXIT_SUCCESS;
 }
