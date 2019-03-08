@@ -55,7 +55,7 @@ HitRecord scene_hit(const Ray &ray, const std::vector<Sphere> &spheres) {
 }
 
 tmath::vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres,
-                      const std::vector<Light> &lights) {
+                      const std::vector<Light> &lights, const tmath::vec3f &ambient_light) {
 
     HitRecord hit = scene_hit(ray, spheres);
     if (!hit.sphere) {
@@ -64,7 +64,7 @@ tmath::vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres,
         tmath::vec3f white = tmath::vec3f(1.0f, 1.0f, 1.0f);
         tmath::vec3f blue = tmath::vec3f(0.5f, 0.7f, 1.0f);
 
-        return (1.0f - k) * white + k * blue;
+        return 255.0f * ((1.0f - k) * white + k * blue);
     }
 
     tmath::vec3f diffuse_light_intensity(0.0f, 0.0f, 0.0f);
@@ -72,21 +72,48 @@ tmath::vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres,
     tmath::vec3f hit_point = ray.at(hit.t);
     tmath::vec3f normal = tmath::normalize(hit_point - hit.sphere->center);
     for (const auto &light : lights) {
-        tmath::vec3f light_dir = tmath::normalize(light.position - hit_point);
-        diffuse_light_intensity += light.intensity * std::max(0.0f, tmath::dot(light_dir, normal));
-        specular_light_intensity +=
-            light.intensity *
-            std::pow(std::max(0.0f, -tmath::dot(tmath::reflect(-1.0f * light_dir, normal),
-                                                ray.direction)),
-                     hit.sphere->material.specular_exponent);
+        tmath::vec3f light_vec = light.position - hit_point;
+        float light_distance = tmath::length(light_vec);
+        // calculate this way, because we can reuse the distance
+        tmath::vec3f light_dir = light_vec / light_distance;
+        diffuse_light_intensity += light.intensity * std::max(0.0f, tmath::dot(light_dir, normal)) /
+                                   (light_distance * light_distance);
+
+        // NOTE: this may be calculated without half vector
+        tmath::vec3f to_eye = tmath::normalize(ray.origin - hit_point);
+        tmath::vec3f half = tmath::normalize(light_dir + to_eye);
+        float nh_angle = std::max(0.0f, tmath::dot(normal, half));
+        specular_light_intensity += light.intensity *
+                                    std::pow(nh_angle, hit.sphere->material.specular_exponent) /
+                                    (light_distance * light_distance);
     }
 
     return hit.sphere->material.diffuse * diffuse_light_intensity +
-           hit.sphere->material.specular * specular_light_intensity;
+           hit.sphere->material.specular * specular_light_intensity +
+           hit.sphere->material.ambient * ambient_light;
+#if 0
+    tmath::vec3f total_outgoing;
+    tmath::vec3f hit_point = ray.at(hit.t);
+    tmath::vec3f normal = tmath::normalize(hit_point - hit.sphere->center);
+    for (const auto &light : lights) {
+        tmath::vec3f to_light = light.position - hit_point;
+        float cos_theta = std::max(0.0f, tmath::dot(tmath::normalize(to_light), normal));
+        float dist = tmath::length(to_light);
+        float cos_theta_over_dist_squared = cos_theta / (dist * dist);
+
+        tmath::vec3f outgoing;
+        outgoing.x = (hit.sphere->material.diffuse.x * light.intensity.x) * cos_theta_over_dist_squared;
+        outgoing.y = (hit.sphere->material.diffuse.y * light.intensity.y) * cos_theta_over_dist_squared;
+        outgoing.z = (hit.sphere->material.diffuse.z * light.intensity.z) * cos_theta_over_dist_squared;
+        total_outgoing += outgoing;
+    }
+
+    return total_outgoing;
+#endif
 }
 
 void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights,
-            const parser::Camera &camera) {
+            const tmath::vec3f &ambient_light, const parser::Camera &camera) {
     int image_width = camera.image_width;
     int image_height = camera.image_height;
 
@@ -120,11 +147,12 @@ void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights
             float sv = (tb * (y + 0.5f)) / image_height;
 
             Ray r(origin, (top_left + su * right - sv * camera.up) - origin);
-            tmath::vec3f value = tmath::clamp(cast_ray(r, spheres, lights), 0.0f, 1.0f);
+            tmath::vec3f value =
+                tmath::clamp(cast_ray(r, spheres, lights, ambient_light), 0.0f, 255.0f);
             Color c;
-            c.r = static_cast<uint8_t>(value.x * 255.99f);
-            c.g = static_cast<uint8_t>(value.y * 255.99f);
-            c.b = static_cast<uint8_t>(value.z * 255.99f);
+            c.r = static_cast<uint8_t>(value.x);
+            c.g = static_cast<uint8_t>(value.y);
+            c.b = static_cast<uint8_t>(value.z);
 
             image[y * image_width + x] = c;
         }
@@ -160,10 +188,11 @@ int main(int argc, char **argv) {
     std::vector<Sphere> spheres;
     for (const auto &sphere : scene.spheres) {
         // TODO: add mirror and ambient
-        Material m(scene.materials[sphere.material_id-1].diffuse,
-                   scene.materials[sphere.material_id-1].specular,
-                   scene.materials[sphere.material_id-1].phong_exponent);
-        Sphere s(scene.vertex_data[sphere.center_vertex_id-1], sphere.radius, m);
+        Material m(scene.materials[sphere.material_id - 1].diffuse,
+                   scene.materials[sphere.material_id - 1].specular,
+                   scene.materials[sphere.material_id - 1].ambient,
+                   scene.materials[sphere.material_id - 1].phong_exponent);
+        Sphere s(scene.vertex_data[sphere.center_vertex_id - 1], sphere.radius, m);
         spheres.emplace_back(s);
     }
 
@@ -175,6 +204,6 @@ int main(int argc, char **argv) {
         lights.emplace_back(l);
     }
 
-    render(spheres, lights, scene.cameras[0]);
+    render(spheres, lights, scene.ambient_light, scene.cameras[0]);
     return EXIT_SUCCESS;
 }
