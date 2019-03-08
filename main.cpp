@@ -67,6 +67,8 @@ tmath::vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres,
         return 255.0f * ((1.0f - k) * white + k * blue);
     }
 
+    tmath::vec3f total_light = hit.sphere->material.ambient * ambient_light;
+
     tmath::vec3f diffuse_light_intensity(0.0f, 0.0f, 0.0f);
     tmath::vec3f specular_light_intensity(0.0f, 0.0f, 0.0f);
     tmath::vec3f hit_point = ray.at(hit.t);
@@ -74,6 +76,14 @@ tmath::vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres,
     for (const auto &light : lights) {
         tmath::vec3f light_vec = light.position - hit_point;
         float light_distance = tmath::length(light_vec);
+
+        // TODO: get epsilon from xml
+        Ray shadow_ray(hit_point + 1e-3 * normal, light_vec);
+        HitRecord shadow_hit = scene_hit(shadow_ray, spheres);
+
+        if (shadow_hit.sphere && shadow_hit.t < light_distance)
+            continue;
+
         // calculate this way, because we can reuse the distance
         tmath::vec3f light_dir = light_vec / light_distance;
         diffuse_light_intensity += light.intensity * std::max(0.0f, tmath::dot(light_dir, normal)) /
@@ -88,28 +98,9 @@ tmath::vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres,
                                     (light_distance * light_distance);
     }
 
-    return hit.sphere->material.diffuse * diffuse_light_intensity +
-           hit.sphere->material.specular * specular_light_intensity +
-           hit.sphere->material.ambient * ambient_light;
-#if 0
-    tmath::vec3f total_outgoing;
-    tmath::vec3f hit_point = ray.at(hit.t);
-    tmath::vec3f normal = tmath::normalize(hit_point - hit.sphere->center);
-    for (const auto &light : lights) {
-        tmath::vec3f to_light = light.position - hit_point;
-        float cos_theta = std::max(0.0f, tmath::dot(tmath::normalize(to_light), normal));
-        float dist = tmath::length(to_light);
-        float cos_theta_over_dist_squared = cos_theta / (dist * dist);
-
-        tmath::vec3f outgoing;
-        outgoing.x = (hit.sphere->material.diffuse.x * light.intensity.x) * cos_theta_over_dist_squared;
-        outgoing.y = (hit.sphere->material.diffuse.y * light.intensity.y) * cos_theta_over_dist_squared;
-        outgoing.z = (hit.sphere->material.diffuse.z * light.intensity.z) * cos_theta_over_dist_squared;
-        total_outgoing += outgoing;
-    }
-
-    return total_outgoing;
-#endif
+    total_light =  hit.sphere->material.diffuse * diffuse_light_intensity +
+           hit.sphere->material.specular * specular_light_intensity;
+    return total_light;
 }
 
 void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights,
@@ -130,13 +121,6 @@ void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights
 
     float rl = r - l;
     float tb = t - b;
-
-#if 0
-    tmath::vec3f horizontal(16.0f, 0.0f, 0.0f);
-    tmath::vec3f vertical(0.0f, -9.0f, 0.0f);
-    tmath::vec3f u = horizontal / image_width;
-    tmath::vec3f v = vertical / image_height;
-#endif
 
     std::vector<Color> image(image_width * image_height);
 
@@ -163,19 +147,6 @@ void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights
 }
 
 int main(int argc, char **argv) {
-#if 0
-    Material darkred(tmath::vec3f(0.7f, 0.0f, 0.3f), tmath::vec3f(0.7f, 0.0f, 0.3f), 8);
-    Material beige(tmath::vec3f(0.9f, 0.9f, 0.7f), tmath::vec3f(0.9f, 0.9f, 0.7f), 8);
-    Sphere sphere(tmath::vec3f(-4.0f, 0.0f, -7.0f), 1.75f, darkred);
-    Sphere sphere2(tmath::vec3f(4.0f, 2.0f, -9.0f), 2.0f, beige);
-    std::vector<Sphere> spheres = {sphere, sphere2};
-
-    Light light;
-    light.position = tmath::vec3f(-6.0f, 4.0f, -5.0f);
-    tmath::vec3f white = tmath::vec3f(0.9f, 0.9f, 0.9f);
-    light.intensity = white;
-    std::vector<Light> lights = {light};
-#endif
 
     if (argc != 2) {
         fprintf(stderr, "usage: ./raiden [scene_file]\n");
