@@ -50,17 +50,17 @@ tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::ve
     for (const auto &light : lights) {
         tmath::vec3f light_vec = light.position - hit_point;
         float light_distance = tmath::length(light_vec);
+        // calculate this way, because we can reuse the distance
+        tmath::vec3f light_dir = light_vec / light_distance;
 
         // TODO: get epsilon from xml
-        Ray shadow_ray(hit_point + 1e-3 * normal, light_vec);
+        Ray shadow_ray(hit_point + 1e-3 * normal, light_dir);
         // HitRecord shadow_hit = scene_hit(shadow_ray, spheres);
         auto shadow_hit = surfaces.hit(shadow_ray);
 
         if (shadow_hit && shadow_hit->t < light_distance)
             continue;
 
-        // calculate this way, because we can reuse the distance
-        tmath::vec3f light_dir = light_vec / light_distance;
         diffuse_light_intensity += light.intensity * std::max(0.0f, tmath::dot(light_dir, normal)) /
                                    (light_distance * light_distance);
 
