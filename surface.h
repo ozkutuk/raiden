@@ -53,3 +53,11 @@ class Triangle : public Surface {
     Material material;
 };
 
+class Mesh : public Surface {
+  public:
+    explicit Mesh(std::vector<Triangle> triangles, Material material);
+    std::optional<HitRecord> hit(const Ray &ray) const override;
+
+    std::vector<Triangle> triangles;
+    Material material;
+};

@@ -88,17 +88,17 @@ std::optional<HitRecord> Triangle::hit(const Ray &ray) const {
     float denominator = a*ei_hf + b*gf_di + c*dh_eg;
 
     float beta  =  (j*ei_hf + k*gf_di + l*dh_eg) / denominator;
-    if (beta <= 0.0f || beta >= 1.0f)
+    if (beta < 0.0f || beta > 1.0f)
         return {};
 
     float ak_jb = a*k - j*b;
     float jc_al = j*c - a*l;
     float bl_kc = b*l - k*c;
     float gamma =  (i*ak_jb + h*jc_al + g*bl_kc) / denominator;
-    if (gamma <= 0.0f || gamma >= 1.0f)
+    if (gamma < 0.0f || gamma > 1.0f)
         return {};
 
-    if (beta + gamma >= 1.0f)
+    if (beta + gamma > 1.0f)
         return {};
 
     float t     = -(f*ak_jb + e*jc_al + d*bl_kc) / denominator;
@@ -111,7 +111,24 @@ std::optional<HitRecord> Triangle::hit(const Ray &ray) const {
     }
 
     return {};
-
-
 }
+
+Mesh::Mesh(std::vector<Triangle> triangles, Material material)
+    : triangles(std::move(triangles)), material(std::move(material)) {
+}
+
+std::optional<HitRecord> Mesh::hit(const Ray &ray) const {
+    float t = std::numeric_limits<float>::max();
+    std::optional<HitRecord> hit_record;
+    for (const auto &triangle : triangles) {
+        auto intersected = triangle.hit(ray);
+        if (intersected && intersected->t < t) {
+            hit_record = intersected;
+            t = intersected->t;
+        }
+    }
+
+    return hit_record;
+}
+
 

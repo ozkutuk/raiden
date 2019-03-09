@@ -36,7 +36,7 @@ tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::ve
     auto intersected = surfaces.hit(ray);
     if (!intersected) {
         // TODO: get bg color from scene
-        return tmath::vec3f(255.0f, 0.0f, 0.0f);
+        return tmath::vec3f(0.0f, 0.0f, 0.0f);
     }
 
     tmath::vec3f total_light = intersected->material->ambient * ambient_light;
@@ -163,6 +163,24 @@ int main(int argc, char **argv) {
             std::make_unique<Triangle>(scene.vertex_data[triangle.indices.v0_id - 1],
                                        scene.vertex_data[triangle.indices.v1_id - 1],
                                        scene.vertex_data[triangle.indices.v2_id - 1], m);
+        surface_vector.emplace_back(std::move(s));
+    }
+
+    std::vector<Triangle> triangles;
+    for (const auto &mesh : scene.meshes) {
+        Material m(scene.materials[mesh.material_id - 1].diffuse,
+                   scene.materials[mesh.material_id - 1].specular,
+                   scene.materials[mesh.material_id - 1].ambient,
+                   scene.materials[mesh.material_id - 1].mirror,
+                   scene.materials[mesh.material_id - 1].phong_exponent);
+
+        for (const auto &face : mesh.faces) {
+            triangles.emplace_back(Triangle(scene.vertex_data[face.v0_id - 1],
+                                            scene.vertex_data[face.v1_id - 1],
+                                            scene.vertex_data[face.v2_id - 1], m));
+        }
+
+        std::unique_ptr<Surface> s = std::make_unique<Mesh>(triangles, m);
         surface_vector.emplace_back(std::move(s));
     }
 
