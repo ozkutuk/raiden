@@ -59,19 +59,12 @@ namespace parser
         int v0_id;
         int v1_id;
         int v2_id;
-        tmath::vec3f normal;
-    };
-
-    struct Box {
-        tmath::vec3f minExtent;
-        tmath::vec3f maxExtent;
     };
 
     struct Mesh
     {
         int material_id;
         std::vector<Face> faces;
-        Box boundingBox;
     };
 
     struct Triangle

@@ -11,11 +11,12 @@
 #include <algorithm>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <vector>
 
 #include "parser.h"
 #include "ray.h"
-#include "sphere.h"
+#include "surface.h"
 #include "tinymath.h"
 
 struct Color {
@@ -24,70 +25,42 @@ struct Color {
     uint8_t b;
 };
 
-struct HitRecord {
-    const Sphere *sphere;
-    float t;
-};
-
 struct Light {
     tmath::vec3f intensity;
     tmath::vec3f position;
 };
 
-HitRecord scene_hit(const Ray &ray, const std::vector<Sphere> &spheres) {
-    float distance = std::numeric_limits<float>::max();
-    const Sphere *closest = nullptr;
-    for (const auto &sphere : spheres) {
-        float t = sphere.hit(ray);
-        if (t > 0 && t < distance) {
-            distance = t;
-            closest = &sphere;
-        }
+tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::vector<Light> &lights,
+                      const tmath::vec3f &ambient_light, int recursion_depth) {
+
+    auto intersected = surfaces.hit(ray);
+    if (!intersected) {
+        // TODO: get bg color from scene
+        return tmath::vec3f(0.0f, 0.0f, 0.0f);
     }
 
-    HitRecord hit;
-    if (distance < 1000)
-        hit.sphere = closest;
-    else
-        hit.sphere = nullptr;
-    hit.t = distance;
-    return hit;
-}
-
-tmath::vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres,
-                      const std::vector<Light> &lights, const tmath::vec3f &ambient_light,
-                      int recursion_depth) {
-
-    HitRecord hit = scene_hit(ray, spheres);
-    if (!hit.sphere) {
-        tmath::vec3f unit = tmath::normalize(ray.direction);
-        float k = 0.5f * (unit.y + 1.0f);
-        tmath::vec3f white = tmath::vec3f(1.0f, 1.0f, 1.0f);
-        tmath::vec3f blue = tmath::vec3f(0.5f, 0.7f, 1.0f);
-
-        return 255.0f * ((1.0f - k) * white + k * blue);
-    }
-
-    tmath::vec3f total_light = hit.sphere->material.ambient * ambient_light;
+    tmath::vec3f total_light = intersected->material->ambient * ambient_light;
 
     tmath::vec3f diffuse_light_intensity(0.0f, 0.0f, 0.0f);
     tmath::vec3f specular_light_intensity(0.0f, 0.0f, 0.0f);
-    tmath::vec3f hit_point = ray.at(hit.t);
-    tmath::vec3f normal = tmath::normalize(hit_point - hit.sphere->center);
+    tmath::vec3f hit_point = ray.at(intersected->t);
+    // tmath::vec3f normal = tmath::normalize(hit_point - hit.sphere->center);
+    tmath::vec3f normal = intersected->normal;
     tmath::vec3f to_eye = tmath::normalize(ray.origin - hit_point);
     for (const auto &light : lights) {
         tmath::vec3f light_vec = light.position - hit_point;
         float light_distance = tmath::length(light_vec);
-
-        // TODO: get epsilon from xml
-        Ray shadow_ray(hit_point + 1e-3 * normal, light_vec);
-        HitRecord shadow_hit = scene_hit(shadow_ray, spheres);
-
-        if (shadow_hit.sphere && shadow_hit.t < light_distance)
-            continue;
-
         // calculate this way, because we can reuse the distance
         tmath::vec3f light_dir = light_vec / light_distance;
+
+        // TODO: get epsilon from xml
+        Ray shadow_ray(hit_point + 1e-3 * normal, light_dir);
+        // HitRecord shadow_hit = scene_hit(shadow_ray, spheres);
+        auto shadow_hit = surfaces.hit(shadow_ray);
+
+        if (shadow_hit && shadow_hit->t < light_distance)
+            continue;
+
         diffuse_light_intensity += light.intensity * std::max(0.0f, tmath::dot(light_dir, normal)) /
                                    (light_distance * light_distance);
 
@@ -95,25 +68,26 @@ tmath::vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres,
         tmath::vec3f half = tmath::normalize(light_dir + to_eye);
         float nh_angle = std::max(0.0f, tmath::dot(normal, half));
         specular_light_intensity += light.intensity *
-                                    std::pow(nh_angle, hit.sphere->material.specular_exponent) /
+                                    std::pow(nh_angle, intersected->material->specular_exponent) /
                                     (light_distance * light_distance);
     }
 
-    total_light = hit.sphere->material.diffuse * diffuse_light_intensity +
-                  hit.sphere->material.specular * specular_light_intensity;
+    total_light = intersected->material->diffuse * diffuse_light_intensity +
+                  intersected->material->specular * specular_light_intensity;
 
-    if (tmath::length(hit.sphere->material.mirror_reflectance) != 0 && recursion_depth > 0) {
+    if (tmath::length(intersected->material->mirror_reflectance) != 0 && recursion_depth > 0) {
         Ray reflected(hit_point + 1e-3 * normal, tmath::reflect(-1.0f * to_eye, normal));
         // TODO: get rid of this awful re-calculation
-        if (scene_hit(reflected, spheres).sphere)
-            total_light += hit.sphere->material.mirror_reflectance *
-                           cast_ray(reflected, spheres, lights, ambient_light, recursion_depth - 1);
+        if (surfaces.hit(reflected))
+            total_light +=
+                intersected->material->mirror_reflectance *
+                cast_ray(reflected, surfaces, lights, ambient_light, recursion_depth - 1);
     }
 
     return total_light;
 }
 
-void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights,
+void render(const SurfaceList &surfaces, const std::vector<Light> &lights,
             const tmath::vec3f &ambient_light, const parser::Camera &camera) {
     int image_width = camera.image_width;
     int image_height = camera.image_height;
@@ -140,10 +114,10 @@ void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights
             float su = (rl * (x + 0.5f)) / image_width;
             float sv = (tb * (y + 0.5f)) / image_height;
 
-            Ray r(origin, (top_left + su * right - sv * camera.up) - origin);
+            Ray r(origin, tmath::normalize((top_left + su * right - sv * camera.up) - origin));
             // TODO: get recursion depth from xml
             tmath::vec3f value =
-                tmath::clamp(cast_ray(r, spheres, lights, ambient_light, 6), 0.0f, 255.0f);
+                tmath::clamp(cast_ray(r, surfaces, lights, ambient_light, 6), 0.0f, 255.0f);
             Color c;
             c.r = static_cast<uint8_t>(value.x);
             c.g = static_cast<uint8_t>(value.y);
@@ -167,17 +141,50 @@ int main(int argc, char **argv) {
     parser::Scene scene;
     scene.loadFromXml(argv[1]);
 
-    std::vector<Sphere> spheres;
+    std::vector<std::unique_ptr<Surface>> surface_vector;
     for (const auto &sphere : scene.spheres) {
-        // TODO: add mirror and ambient
         Material m(scene.materials[sphere.material_id - 1].diffuse,
                    scene.materials[sphere.material_id - 1].specular,
                    scene.materials[sphere.material_id - 1].ambient,
                    scene.materials[sphere.material_id - 1].mirror,
                    scene.materials[sphere.material_id - 1].phong_exponent);
-        Sphere s(scene.vertex_data[sphere.center_vertex_id - 1], sphere.radius, m);
-        spheres.emplace_back(s);
+        std::unique_ptr<Surface> s = std::make_unique<Sphere>(
+            scene.vertex_data[sphere.center_vertex_id - 1], sphere.radius, m);
+        surface_vector.emplace_back(std::move(s));
     }
+
+    for (const auto &triangle : scene.triangles) {
+        Material m(scene.materials[triangle.material_id - 1].diffuse,
+                   scene.materials[triangle.material_id - 1].specular,
+                   scene.materials[triangle.material_id - 1].ambient,
+                   scene.materials[triangle.material_id - 1].mirror,
+                   scene.materials[triangle.material_id - 1].phong_exponent);
+        std::unique_ptr<Surface> s =
+            std::make_unique<Triangle>(scene.vertex_data[triangle.indices.v0_id - 1],
+                                       scene.vertex_data[triangle.indices.v1_id - 1],
+                                       scene.vertex_data[triangle.indices.v2_id - 1], m);
+        surface_vector.emplace_back(std::move(s));
+    }
+
+    std::vector<Triangle> triangles;
+    for (const auto &mesh : scene.meshes) {
+        Material m(scene.materials[mesh.material_id - 1].diffuse,
+                   scene.materials[mesh.material_id - 1].specular,
+                   scene.materials[mesh.material_id - 1].ambient,
+                   scene.materials[mesh.material_id - 1].mirror,
+                   scene.materials[mesh.material_id - 1].phong_exponent);
+
+        for (const auto &face : mesh.faces) {
+            triangles.emplace_back(Triangle(scene.vertex_data[face.v0_id - 1],
+                                            scene.vertex_data[face.v1_id - 1],
+                                            scene.vertex_data[face.v2_id - 1], m));
+        }
+
+        std::unique_ptr<Surface> s = std::make_unique<Mesh>(triangles, m);
+        surface_vector.emplace_back(std::move(s));
+    }
+
+    SurfaceList surfaces(std::move(surface_vector));
 
     std::vector<Light> lights;
     for (const auto &light : scene.point_lights) {
@@ -188,6 +195,6 @@ int main(int argc, char **argv) {
     }
 
     // TODO: render for each camera in xml
-    render(spheres, lights, scene.ambient_light, scene.cameras[0]);
+    render(surfaces, lights, scene.ambient_light, scene.cameras[0]);
     return EXIT_SUCCESS;
 }
