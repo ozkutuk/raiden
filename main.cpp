@@ -167,6 +167,7 @@ int main(int argc, char **argv) {
     }
 
     std::vector<Triangle> triangles;
+    // TODO: remove duplicate materials from each triangle, one for a mesh is enough
     for (const auto &mesh : scene.meshes) {
         Material m(scene.materials[mesh.material_id - 1].diffuse,
                    scene.materials[mesh.material_id - 1].specular,

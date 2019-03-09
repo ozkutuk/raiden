@@ -73,10 +73,9 @@ std::optional<HitRecord> Triangle::hit(const Ray &ray) const {
     float e = v1.y - v3.y;
     float f = v1.z - v3.z;
 
-    tmath::vec3f direction = tmath::normalize(ray.direction);
-    float g = direction.x;
-    float h = direction.y;
-    float i = direction.z;
+    float g = ray.direction.x;
+    float h = ray.direction.y;
+    float i = ray.direction.z;
 
     float j = v1.x - ray.origin.x;
     float k = v1.y - ray.origin.y;
