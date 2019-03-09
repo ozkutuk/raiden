@@ -4,38 +4,25 @@
 #include "tinymath.h"
 
 #include <cmath>
-#include <vector>
 #include <utility>
+#include <vector>
 
-SurfaceList::SurfaceList(std::vector<std::unique_ptr<Surface>> surfaces) : surfaces(std::move(surfaces)) {
+SurfaceList::SurfaceList(std::vector<std::unique_ptr<Surface>> surfaces)
+    : surfaces(std::move(surfaces)) {
 }
 
 std::optional<HitRecord> SurfaceList::hit(const Ray &ray) const {
-    // float distance = std::numeric_limits<float>::max();
-    // const Surface *closest = nullptr;
+    float t = std::numeric_limits<float>::max();
     std::optional<HitRecord> hit_record;
     for (const auto &surface : surfaces) {
         auto intersected = surface->hit(ray);
-        // if (t > T_MIN && t < distance) {
-        if (intersected) {
+        if (intersected && intersected->t < t) {
             hit_record = intersected;
-            // distance = t;
-            // closest = &surface;
+            t = intersected->t;
         }
     }
 
     return hit_record;
-
-#if 0
-    HitRecord hit;
-    if (distance < T_MAX)
-        hit.sphere = closest;
-    else
-        hit.sphere = nullptr;
-    hit.t = distance;
-    return hit;
-#endif
-
 }
 
 Sphere::Sphere(tmath::vec3f center, float radius, Material material)
@@ -68,3 +55,63 @@ std::optional<HitRecord> Sphere::hit(const Ray &ray) const {
 
     return {};
 }
+
+Triangle::Triangle(tmath::vec3f v1, tmath::vec3f v2, tmath::vec3f v3, Material material)
+    : v1(std::move(v1)), v2(std::move(v2)), v3(std::move(v3)), material(std::move(material)) {
+}
+
+std::optional<HitRecord> Triangle::hit(const Ray &ray) const {
+    // [ a d g ][ beta  ]   [ j ]
+    // [ b e h ][ gamma ] = [ k ]
+    // [ c f i ][   t   ]   [ l ]
+
+    float a = v1.x - v2.x;
+    float b = v1.y - v2.y;
+    float c = v1.z - v2.z;
+
+    float d = v1.x - v3.x;
+    float e = v1.y - v3.y;
+    float f = v1.z - v3.z;
+
+    tmath::vec3f direction = tmath::normalize(ray.direction);
+    float g = direction.x;
+    float h = direction.y;
+    float i = direction.z;
+
+    float j = v1.x - ray.origin.x;
+    float k = v1.y - ray.origin.y;
+    float l = v1.z - ray.origin.z;
+
+    float ei_hf = e*i - h*f;
+    float gf_di = g*f - d*i;
+    float dh_eg = d*h - e*g;
+    float denominator = a*ei_hf + b*gf_di + c*dh_eg;
+
+    float beta  =  (j*ei_hf + k*gf_di + l*dh_eg) / denominator;
+    if (beta <= 0.0f || beta >= 1.0f)
+        return {};
+
+    float ak_jb = a*k - j*b;
+    float jc_al = j*c - a*l;
+    float bl_kc = b*l - k*c;
+    float gamma =  (i*ak_jb + h*jc_al + g*bl_kc) / denominator;
+    if (gamma <= 0.0f || gamma >= 1.0f)
+        return {};
+
+    if (beta + gamma >= 1.0f)
+        return {};
+
+    float t     = -(f*ak_jb + e*jc_al + d*bl_kc) / denominator;
+    if (t > T_MIN && t < T_MAX) {
+        HitRecord hit_record;
+        hit_record.t = t;
+        hit_record.normal = tmath::normalize(tmath::cross(v2 - v1, v3 - v1));
+        hit_record.material = &(this->material);
+        return hit_record;
+    }
+
+    return {};
+
+
+}
+

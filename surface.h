@@ -1,8 +1,8 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <vector>
-#include <memory>
 
 #include "material.h"
 #include "tinymath.h"
@@ -39,6 +39,17 @@ class Sphere : public Surface {
 
     tmath::vec3f center;
     float radius;
+    Material material;
+};
+
+class Triangle : public Surface {
+  public:
+    explicit Triangle(tmath::vec3f v1, tmath::vec3f v2, tmath::vec3f v3, Material material);
+    std::optional<HitRecord> hit(const Ray &ray) const override;
+
+    tmath::vec3f v1;
+    tmath::vec3f v2;
+    tmath::vec3f v3;
     Material material;
 };
 

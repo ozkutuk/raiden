@@ -11,8 +11,8 @@
 #include <algorithm>
 #include <cstdint>
 #include <limits>
-#include <vector>
 #include <memory>
+#include <vector>
 
 #include "parser.h"
 #include "ray.h"
@@ -35,12 +35,8 @@ tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::ve
 
     auto intersected = surfaces.hit(ray);
     if (!intersected) {
-        tmath::vec3f unit = tmath::normalize(ray.direction);
-        float k = 0.5f * (unit.y + 1.0f);
-        tmath::vec3f white = tmath::vec3f(1.0f, 1.0f, 1.0f);
-        tmath::vec3f blue = tmath::vec3f(0.5f, 0.7f, 1.0f);
-
-        return 255.0f * ((1.0f - k) * white + k * blue);
+        // TODO: get bg color from scene
+        return tmath::vec3f(255.0f, 0.0f, 0.0f);
     }
 
     tmath::vec3f total_light = intersected->material->ambient * ambient_light;
@@ -118,7 +114,7 @@ void render(const SurfaceList &surfaces, const std::vector<Light> &lights,
             float su = (rl * (x + 0.5f)) / image_width;
             float sv = (tb * (y + 0.5f)) / image_height;
 
-            Ray r(origin, (top_left + su * right - sv * camera.up) - origin);
+            Ray r(origin, tmath::normalize((top_left + su * right - sv * camera.up) - origin));
             // TODO: get recursion depth from xml
             tmath::vec3f value =
                 tmath::clamp(cast_ray(r, surfaces, lights, ambient_light, 6), 0.0f, 255.0f);
@@ -147,14 +143,26 @@ int main(int argc, char **argv) {
 
     std::vector<std::unique_ptr<Surface>> surface_vector;
     for (const auto &sphere : scene.spheres) {
-        // TODO: add mirror and ambient
         Material m(scene.materials[sphere.material_id - 1].diffuse,
                    scene.materials[sphere.material_id - 1].specular,
                    scene.materials[sphere.material_id - 1].ambient,
                    scene.materials[sphere.material_id - 1].mirror,
                    scene.materials[sphere.material_id - 1].phong_exponent);
-        std::unique_ptr<Surface> s = std::make_unique<Sphere>(scene.vertex_data[sphere.center_vertex_id - 1],
-                                          sphere.radius, m);
+        std::unique_ptr<Surface> s = std::make_unique<Sphere>(
+            scene.vertex_data[sphere.center_vertex_id - 1], sphere.radius, m);
+        surface_vector.emplace_back(std::move(s));
+    }
+
+    for (const auto &triangle : scene.triangles) {
+        Material m(scene.materials[triangle.material_id - 1].diffuse,
+                   scene.materials[triangle.material_id - 1].specular,
+                   scene.materials[triangle.material_id - 1].ambient,
+                   scene.materials[triangle.material_id - 1].mirror,
+                   scene.materials[triangle.material_id - 1].phong_exponent);
+        std::unique_ptr<Surface> s =
+            std::make_unique<Triangle>(scene.vertex_data[triangle.indices.v0_id - 1],
+                                       scene.vertex_data[triangle.indices.v1_id - 1],
+                                       scene.vertex_data[triangle.indices.v2_id - 1], m);
         surface_vector.emplace_back(std::move(s));
     }
 
