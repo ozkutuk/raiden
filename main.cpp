@@ -44,7 +44,6 @@ tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::ve
     tmath::vec3f diffuse_light_intensity(0.0f, 0.0f, 0.0f);
     tmath::vec3f specular_light_intensity(0.0f, 0.0f, 0.0f);
     tmath::vec3f hit_point = ray.at(intersected->t);
-    // tmath::vec3f normal = tmath::normalize(hit_point - hit.sphere->center);
     tmath::vec3f normal = intersected->normal;
     tmath::vec3f to_eye = tmath::normalize(ray.origin - hit_point);
     for (const auto &light : lights) {
@@ -54,7 +53,6 @@ tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::ve
         tmath::vec3f light_dir = light_vec / light_distance;
 
         Ray shadow_ray(hit_point + epsilon * normal, light_dir);
-        // HitRecord shadow_hit = scene_hit(shadow_ray, spheres);
         auto shadow_hit = surfaces.hit(shadow_ray);
 
         if (shadow_hit && shadow_hit->t < light_distance)
@@ -71,7 +69,7 @@ tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::ve
                                     (light_distance * light_distance);
     }
 
-    total_light = intersected->material->diffuse * diffuse_light_intensity +
+    total_light += intersected->material->diffuse * diffuse_light_intensity +
                   intersected->material->specular * specular_light_intensity;
 
     if (tmath::length(intersected->material->mirror_reflectance) != 0 && recursion_depth > 0) {
