@@ -31,12 +31,12 @@ struct Light {
 };
 
 tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::vector<Light> &lights,
-                      const tmath::vec3f &ambient_light, int recursion_depth) {
+                      const tmath::vec3f &ambient_light, const tmath::vec3f &background,
+                      float epsilon, int recursion_depth) {
 
     auto intersected = surfaces.hit(ray);
     if (!intersected) {
-        // TODO: get bg color from scene
-        return tmath::vec3f(0.0f, 0.0f, 0.0f);
+        return background;
     }
 
     tmath::vec3f total_light = intersected->material->ambient * ambient_light;
@@ -53,8 +53,7 @@ tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::ve
         // calculate this way, because we can reuse the distance
         tmath::vec3f light_dir = light_vec / light_distance;
 
-        // TODO: get epsilon from xml
-        Ray shadow_ray(hit_point + 1e-3 * normal, light_dir);
+        Ray shadow_ray(hit_point + epsilon * normal, light_dir);
         // HitRecord shadow_hit = scene_hit(shadow_ray, spheres);
         auto shadow_hit = surfaces.hit(shadow_ray);
 
@@ -76,19 +75,20 @@ tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::ve
                   intersected->material->specular * specular_light_intensity;
 
     if (tmath::length(intersected->material->mirror_reflectance) != 0 && recursion_depth > 0) {
-        Ray reflected(hit_point + 1e-3 * normal, tmath::reflect(-1.0f * to_eye, normal));
+        Ray reflected(hit_point + epsilon * normal, tmath::reflect(-1.0f * to_eye, normal));
         // TODO: get rid of this awful re-calculation
         if (surfaces.hit(reflected))
-            total_light +=
-                intersected->material->mirror_reflectance *
-                cast_ray(reflected, surfaces, lights, ambient_light, recursion_depth - 1);
+            total_light += intersected->material->mirror_reflectance *
+                           cast_ray(reflected, surfaces, lights, ambient_light, background,
+                                    epsilon, recursion_depth - 1);
     }
 
     return total_light;
 }
 
 void render(const SurfaceList &surfaces, const std::vector<Light> &lights,
-            const tmath::vec3f &ambient_light, int max_recursion, const parser::Camera &camera) {
+            const tmath::vec3f &ambient_light, const tmath::vec3f &background, float epsilon,
+            int max_recursion, const parser::Camera &camera) {
     int image_width = camera.image_width;
     int image_height = camera.image_height;
 
@@ -115,8 +115,9 @@ void render(const SurfaceList &surfaces, const std::vector<Light> &lights,
             float sv = (tb * (y + 0.5f)) / image_height;
 
             Ray r(origin, tmath::normalize((top_left + su * right - sv * camera.up) - origin));
-            tmath::vec3f value =
-                tmath::clamp(cast_ray(r, surfaces, lights, ambient_light, max_recursion), 0.0f, 255.0f);
+            tmath::vec3f value = tmath::clamp(
+                cast_ray(r, surfaces, lights, ambient_light, background, epsilon, max_recursion),
+                0.0f, 255.0f);
             Color c;
             c.r = static_cast<uint8_t>(value.x);
             c.g = static_cast<uint8_t>(value.y);
@@ -195,6 +196,7 @@ int main(int argc, char **argv) {
     }
 
     for (const auto &camera : scene.cameras)
-        render(surfaces, lights, scene.ambient_light, scene.max_recursion_depth, camera);
+        render(surfaces, lights, scene.ambient_light, scene.background_color,
+               scene.shadow_ray_epsilon, scene.max_recursion_depth, camera);
     return EXIT_SUCCESS;
 }
