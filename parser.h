@@ -83,7 +83,7 @@ namespace parser
     struct Scene
     {
         //Data
-        Vec3i background_color;
+        Vec3f background_color;
         float shadow_ray_epsilon;
         int max_recursion_depth;
         std::vector<Camera> cameras;
