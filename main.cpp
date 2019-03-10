@@ -127,7 +127,7 @@ void render(const SurfaceList &surfaces, const std::vector<Light> &lights,
         }
     }
 
-    stbi_write_png("out.png", image_width, image_height, 3, image.data(),
+    stbi_write_png(camera.image_name.c_str(), image_width, image_height, 3, image.data(),
                    image_width * sizeof(Color));
 }
 
@@ -195,7 +195,7 @@ int main(int argc, char **argv) {
         lights.emplace_back(l);
     }
 
-    // TODO: render for each camera in xml
-    render(surfaces, lights, scene.ambient_light, scene.cameras[0]);
+    for (const auto &camera : scene.cameras)
+        render(surfaces, lights, scene.ambient_light, camera);
     return EXIT_SUCCESS;
 }
