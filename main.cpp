@@ -88,7 +88,7 @@ tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::ve
 }
 
 void render(const SurfaceList &surfaces, const std::vector<Light> &lights,
-            const tmath::vec3f &ambient_light, const parser::Camera &camera) {
+            const tmath::vec3f &ambient_light, int max_recursion, const parser::Camera &camera) {
     int image_width = camera.image_width;
     int image_height = camera.image_height;
 
@@ -115,9 +115,8 @@ void render(const SurfaceList &surfaces, const std::vector<Light> &lights,
             float sv = (tb * (y + 0.5f)) / image_height;
 
             Ray r(origin, tmath::normalize((top_left + su * right - sv * camera.up) - origin));
-            // TODO: get recursion depth from xml
             tmath::vec3f value =
-                tmath::clamp(cast_ray(r, surfaces, lights, ambient_light, 6), 0.0f, 255.0f);
+                tmath::clamp(cast_ray(r, surfaces, lights, ambient_light, max_recursion), 0.0f, 255.0f);
             Color c;
             c.r = static_cast<uint8_t>(value.x);
             c.g = static_cast<uint8_t>(value.y);
@@ -196,6 +195,6 @@ int main(int argc, char **argv) {
     }
 
     for (const auto &camera : scene.cameras)
-        render(surfaces, lights, scene.ambient_light, camera);
+        render(surfaces, lights, scene.ambient_light, scene.max_recursion_depth, camera);
     return EXIT_SUCCESS;
 }
