@@ -145,7 +145,10 @@ int main(int argc, char **argv) {
                    scene.materials[sphere.material_id - 1].specular,
                    scene.materials[sphere.material_id - 1].ambient,
                    scene.materials[sphere.material_id - 1].mirror,
-                   scene.materials[sphere.material_id - 1].phong_exponent);
+                   scene.materials[sphere.material_id - 1].phong_exponent,
+                   scene.materials[sphere.material_id - 1].refractive_index,
+                   scene.materials[sphere.material_id - 1].transparency
+                   );
         std::unique_ptr<Surface> s = std::make_unique<Sphere>(
             scene.vertex_data[sphere.center_vertex_id - 1], sphere.radius, m);
         surface_vector.emplace_back(std::move(s));
@@ -156,7 +159,10 @@ int main(int argc, char **argv) {
                    scene.materials[triangle.material_id - 1].specular,
                    scene.materials[triangle.material_id - 1].ambient,
                    scene.materials[triangle.material_id - 1].mirror,
-                   scene.materials[triangle.material_id - 1].phong_exponent);
+                   scene.materials[triangle.material_id - 1].phong_exponent,
+                   scene.materials[triangle.material_id - 1].refractive_index,
+                   scene.materials[triangle.material_id - 1].transparency
+                   );
         std::unique_ptr<Surface> s =
             std::make_unique<Triangle>(scene.vertex_data[triangle.indices.v0_id - 1],
                                        scene.vertex_data[triangle.indices.v1_id - 1],
@@ -171,7 +177,10 @@ int main(int argc, char **argv) {
                    scene.materials[mesh.material_id - 1].specular,
                    scene.materials[mesh.material_id - 1].ambient,
                    scene.materials[mesh.material_id - 1].mirror,
-                   scene.materials[mesh.material_id - 1].phong_exponent);
+                   scene.materials[mesh.material_id - 1].phong_exponent,
+                   scene.materials[mesh.material_id - 1].refractive_index,
+                   scene.materials[mesh.material_id - 1].transparency
+                   );
 
         for (const auto &face : mesh.faces) {
             triangles.emplace_back(Triangle(scene.vertex_data[face.v0_id - 1],

@@ -52,6 +52,8 @@ namespace parser
         Vec3f specular;
         Vec3f mirror;
         float phong_exponent;
+        float refractive_index;
+        Vec3f transparency;
     };
 
     struct Face
