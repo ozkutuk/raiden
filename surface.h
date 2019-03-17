@@ -51,6 +51,11 @@ class Triangle : public Surface {
     tmath::vec3f v2;
     tmath::vec3f v3;
     Material material;
+
+    // benchmark stuff
+    static uint64_t test_count; 
+    static uint64_t hit_count; 
+
 };
 
 class Mesh : public Surface {

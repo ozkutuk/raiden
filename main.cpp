@@ -9,7 +9,9 @@
 #include "stb_image_write.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <vector>
@@ -178,6 +180,8 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     parser::Scene scene;
     scene.loadFromXml(argv[1]);
 
@@ -244,5 +248,12 @@ int main(int argc, char **argv) {
     for (const auto &camera : scene.cameras)
         render(surfaces, lights, scene.ambient_light, scene.background_color,
                scene.shadow_ray_epsilon, scene.max_recursion_depth, camera);
+
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::high_resolution_clock::now() - start);
+
+    std::cout << "Render time                    : " << elapsed.count() / 1000.0 << "s\n"
+              << "# of ray-triangle tests        : " << Triangle::test_count << "\n"
+              << "# of ray-triangle intersections: " << Triangle::hit_count << std::endl;
     return EXIT_SUCCESS;
 }

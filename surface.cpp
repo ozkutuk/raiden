@@ -7,6 +7,9 @@
 #include <utility>
 #include <vector>
 
+uint64_t Triangle::test_count = 0;
+uint64_t Triangle::hit_count = 0;
+
 SurfaceList::SurfaceList(std::vector<std::unique_ptr<Surface>> surfaces)
     : surfaces(std::move(surfaces)) {
 }
@@ -64,6 +67,8 @@ std::optional<HitRecord> Triangle::hit(const Ray &ray) const {
     // [ a d g ][ beta  ]   [ j ]
     // [ b e h ][ gamma ] = [ k ]
     // [ c f i ][   t   ]   [ l ]
+    
+    test_count += 1;
 
     float a = v1.x - v2.x;
     float b = v1.y - v2.y;
@@ -106,6 +111,7 @@ std::optional<HitRecord> Triangle::hit(const Ray &ray) const {
         hit_record.t = t;
         hit_record.normal = tmath::normalize(tmath::cross(v2 - v1, v3 - v1));
         hit_record.material = &(this->material);
+        hit_count += 1;
         return hit_record;
     }
 
