@@ -96,9 +96,16 @@ tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::ve
         float refraction = 1.0f - reflection;
 
         // TODO: get rid of this awful re-calculation
-        if (surfaces.hit(refracted))
-            total_light += refraction * cast_ray(refracted, surfaces, lights, ambient_light,
-                                                 background, epsilon, recursion_depth - 1);
+        if (auto hit = surfaces.hit(refracted)) {
+            tmath::vec3f attenuation =
+                tmath::vec3f(std::pow(intersected->material->transparency.x, hit->t),
+                             std::pow(intersected->material->transparency.y, hit->t),
+                             std::pow(intersected->material->transparency.z, hit->t));
+
+            total_light += refraction * attenuation *
+                           cast_ray(refracted, surfaces, lights, ambient_light, background, epsilon,
+                                    recursion_depth);
+        }
         if (surfaces.hit(reflected))
             total_light += reflection * cast_ray(reflected, surfaces, lights, ambient_light,
                                                  background, epsilon, recursion_depth - 1);
