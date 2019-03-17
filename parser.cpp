@@ -142,7 +142,7 @@ void parser::Scene::loadFromXml(const std::string& filepath)
         if (child)
             stream << child->GetText() << std::endl;
         else
-            stream << "0.0 0.0 0.0" << std::endl;
+            stream << "1.0 1.0 1.0" << std::endl;
 
         stream >> material.ambient.x >> material.ambient.y >> material.ambient.z;
         stream >> material.diffuse.x >> material.diffuse.y >> material.diffuse.z;

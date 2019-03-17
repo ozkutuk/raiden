@@ -1,5 +1,6 @@
 #include "tinymath.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace tmath {
@@ -119,6 +120,46 @@ vec3f clamp(vec3f v, float min_value, float max_value) {
     v.y = std::min(std::max(v.y, min_value), max_value);
     v.z = std::min(std::max(v.z, min_value), max_value);
     return v;
+}
+
+#if 0
+vec3f refract(const vec3f &incident, const vec3f &normal, float n, float nt) {
+    float d_dot_n = tmath::dot(incident, normal);
+    float n_nt = n / nt;
+    return n_nt * (incident - (normal * d_dot_n)) -
+           normal * std::sqrt(1.0f - (n_nt * n_nt) * (1.0f - d_dot_n * d_dot_n));
+}
+#endif
+#if 0
+Vec3f refract(const vec3f &I, const vec3f &N, float ior) {
+    float cosi = (dot(I, N);
+    float etai = 1, etat = ior;
+    vec3f n = N;
+    if (cosi < 0) {
+        cosi = -cosi;
+    } else {
+        std::swap(etai, etat);
+        n = -1.0f * N;
+    }
+    float eta = etai / etat;
+    float k = 1 - eta * eta * (1 - cosi * cosi);
+    return k < 0 ? 0 : eta * I + (eta * cosi - sqrtf(k)) * n;
+}
+#endif
+
+vec3f refract2(const vec3f &I, const vec3f &N, const float &refractive_index) { // Snell's law
+    float cosi = -std::max(-1.f, std::min(1.f, dot(I, N)));
+    float etai = 1, etat = refractive_index;
+    vec3f n = N;
+    if (cosi < 0) { // if the ray is inside the object, swap the indices and invert the normal to
+                    // get the correct result
+        cosi = -cosi;
+        std::swap(etai, etat);
+        n = -1.0f * N;
+    }
+    float eta = etai / etat;
+    float k = 1 - eta * eta * (1 - cosi * cosi);
+    return k < 0 ? vec3f(0, 0, 0) : I * eta + n * (eta * cosi - sqrtf(k));
 }
 
 } // namespace tmath
