@@ -43,5 +43,8 @@ float dot(const vec3f &lhs, const vec3f &rhs);
 vec3f cross(const vec3f &lhs, const vec3f &rhs);
 vec3f reflect(const vec3f &incident, const vec3f &normal);
 vec3f clamp(vec3f v, float min_value, float max_value);
+// vec3f refract(const vec3f &incident, const vec3f &normal, float n, float nt);
+// vec3f refract(const vec3f &incident, const vec3f &normal, float n);
+vec3f refract2(const vec3f &I, const vec3f &N, const float &refractive_index);
 
 } // namespace tmath

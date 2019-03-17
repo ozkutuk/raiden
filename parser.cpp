@@ -133,12 +133,24 @@ void parser::Scene::loadFromXml(const std::string& filepath)
             stream << child->GetText() << std::endl;
         else
             stream << "1.0" << std::endl;
+        child = element->FirstChildElement("RefractionIndex");
+        if (child)
+            stream << child->GetText() << std::endl;
+        else
+            stream << "0.0" << std::endl;
+        child = element->FirstChildElement("Transparency");
+        if (child)
+            stream << child->GetText() << std::endl;
+        else
+            stream << "1.0 1.0 1.0" << std::endl;
 
         stream >> material.ambient.x >> material.ambient.y >> material.ambient.z;
         stream >> material.diffuse.x >> material.diffuse.y >> material.diffuse.z;
         stream >> material.specular.x >> material.specular.y >> material.specular.z;
         stream >> material.mirror.x >> material.mirror.y >> material.mirror.z;
         stream >> material.phong_exponent;
+        stream >> material.refractive_index;
+        stream >> material.transparency.x >> material.transparency.y >> material.transparency.z;
 
         materials.push_back(material);
         element = element->NextSiblingElement("Material");

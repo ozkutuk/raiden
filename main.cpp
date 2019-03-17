@@ -30,6 +30,13 @@ struct Light {
     tmath::vec3f position;
 };
 
+float fresnel_reflection(const tmath::vec3f &incident, const tmath::vec3f &normal, float eta) {
+    float cos_theta = std::abs(tmath::dot(incident, normal));
+    float r_0 = ((eta - 1.0f) * (eta - 1.0f)) / ((eta + 1.0f) * (eta + 1.0f));
+    float r = r_0 + (1.0f - r_0) * std::pow(1.0f - cos_theta, 5);
+    return r;
+}
+
 tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::vector<Light> &lights,
                       const tmath::vec3f &ambient_light, const tmath::vec3f &background,
                       float epsilon, int recursion_depth) {
@@ -70,15 +77,48 @@ tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::ve
     }
 
     total_light += intersected->material->diffuse * diffuse_light_intensity +
-                  intersected->material->specular * specular_light_intensity;
+                   intersected->material->specular * specular_light_intensity;
 
-    if (tmath::length(intersected->material->mirror_reflectance) != 0 && recursion_depth > 0) {
+    if (intersected->material->refractive_index != 0 && recursion_depth > 0) {
+        tmath::vec3f dir = -1.0f * to_eye;
+        bool outside = tmath::dot(normal, dir) < 0;
+        tmath::vec3f origin = hit_point;
+        if (outside)
+            origin -= epsilon * normal;
+        else
+            origin += epsilon * normal;
+
+        Ray refracted(origin,
+                      tmath::refract2(dir, normal, intersected->material->refractive_index));
+        Ray reflected(hit_point + epsilon * normal, tmath::reflect(-1.0f * to_eye, normal));
+
+        float reflection = fresnel_reflection(dir, normal, intersected->material->refractive_index);
+        float refraction = 1.0f - reflection;
+
+        // TODO: get rid of this awful re-calculation
+        if (auto hit = surfaces.hit(refracted)) {
+            tmath::vec3f attenuation =
+                tmath::vec3f(std::pow(intersected->material->transparency.x, hit->t),
+                             std::pow(intersected->material->transparency.y, hit->t),
+                             std::pow(intersected->material->transparency.z, hit->t));
+
+            total_light += refraction * attenuation *
+                           cast_ray(refracted, surfaces, lights, ambient_light, background, epsilon,
+                                    recursion_depth);
+        }
+        if (surfaces.hit(reflected))
+            total_light += reflection * cast_ray(reflected, surfaces, lights, ambient_light,
+                                                 background, epsilon, recursion_depth - 1);
+
+    }
+
+    else if (tmath::length(intersected->material->mirror_reflectance) != 0 && recursion_depth > 0) {
         Ray reflected(hit_point + epsilon * normal, tmath::reflect(-1.0f * to_eye, normal));
         // TODO: get rid of this awful re-calculation
         if (surfaces.hit(reflected))
             total_light += intersected->material->mirror_reflectance *
-                           cast_ray(reflected, surfaces, lights, ambient_light, background,
-                                    epsilon, recursion_depth - 1);
+                           cast_ray(reflected, surfaces, lights, ambient_light, background, epsilon,
+                                    recursion_depth - 1);
     }
 
     return total_light;
@@ -145,7 +185,9 @@ int main(int argc, char **argv) {
                    scene.materials[sphere.material_id - 1].specular,
                    scene.materials[sphere.material_id - 1].ambient,
                    scene.materials[sphere.material_id - 1].mirror,
-                   scene.materials[sphere.material_id - 1].phong_exponent);
+                   scene.materials[sphere.material_id - 1].phong_exponent,
+                   scene.materials[sphere.material_id - 1].refractive_index,
+                   scene.materials[sphere.material_id - 1].transparency);
         std::unique_ptr<Surface> s = std::make_unique<Sphere>(
             scene.vertex_data[sphere.center_vertex_id - 1], sphere.radius, m);
         surface_vector.emplace_back(std::move(s));
@@ -156,7 +198,9 @@ int main(int argc, char **argv) {
                    scene.materials[triangle.material_id - 1].specular,
                    scene.materials[triangle.material_id - 1].ambient,
                    scene.materials[triangle.material_id - 1].mirror,
-                   scene.materials[triangle.material_id - 1].phong_exponent);
+                   scene.materials[triangle.material_id - 1].phong_exponent,
+                   scene.materials[triangle.material_id - 1].refractive_index,
+                   scene.materials[triangle.material_id - 1].transparency);
         std::unique_ptr<Surface> s =
             std::make_unique<Triangle>(scene.vertex_data[triangle.indices.v0_id - 1],
                                        scene.vertex_data[triangle.indices.v1_id - 1],
@@ -171,7 +215,9 @@ int main(int argc, char **argv) {
                    scene.materials[mesh.material_id - 1].specular,
                    scene.materials[mesh.material_id - 1].ambient,
                    scene.materials[mesh.material_id - 1].mirror,
-                   scene.materials[mesh.material_id - 1].phong_exponent);
+                   scene.materials[mesh.material_id - 1].phong_exponent,
+                   scene.materials[mesh.material_id - 1].refractive_index,
+                   scene.materials[mesh.material_id - 1].transparency);
 
         for (const auto &face : mesh.faces) {
             triangles.emplace_back(Triangle(scene.vertex_data[face.v0_id - 1],
