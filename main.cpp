@@ -30,6 +30,13 @@ struct Light {
     tmath::vec3f position;
 };
 
+float fresnel_reflection(const tmath::vec3f &incident, const tmath::vec3f &normal, float eta) {
+    float cos_theta = std::abs(tmath::dot(incident, normal));
+    float r_0 = ((eta - 1.0f) * (eta - 1.0f)) / ((eta + 1.0f) * (eta + 1.0f));
+    float r = r_0 + (1.0f - r_0) * std::pow(1.0f - cos_theta, 5);
+    return r;
+}
+
 tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::vector<Light> &lights,
                       const tmath::vec3f &ambient_light, const tmath::vec3f &background,
                       float epsilon, int recursion_depth) {
@@ -81,15 +88,24 @@ tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::ve
         else
             origin += epsilon * normal;
 
-        Ray refracted(
-            origin, 
-            tmath::refract2(dir, normal, intersected->material->refractive_index));
+        Ray refracted(origin,
+                      tmath::refract2(dir, normal, intersected->material->refractive_index));
+        Ray reflected(hit_point + epsilon * normal, tmath::reflect(-1.0f * to_eye, normal));
+
+        float reflection = fresnel_reflection(dir, normal, intersected->material->refractive_index);
+        float refraction = 1.0f - reflection;
+
         // TODO: get rid of this awful re-calculation
         if (surfaces.hit(refracted))
-            total_light += cast_ray(refracted, surfaces, lights, ambient_light, background, epsilon,
-                                    recursion_depth - 1);
-    } else if (tmath::length(intersected->material->mirror_reflectance) != 0 &&
-               recursion_depth > 0) {
+            total_light += refraction * cast_ray(refracted, surfaces, lights, ambient_light,
+                                                 background, epsilon, recursion_depth - 1);
+        if (surfaces.hit(reflected))
+            total_light += reflection * cast_ray(reflected, surfaces, lights, ambient_light,
+                                                 background, epsilon, recursion_depth - 1);
+
+    }
+
+    else if (tmath::length(intersected->material->mirror_reflectance) != 0 && recursion_depth > 0) {
         Ray reflected(hit_point + epsilon * normal, tmath::reflect(-1.0f * to_eye, normal));
         // TODO: get rid of this awful re-calculation
         if (surfaces.hit(reflected))
