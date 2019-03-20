@@ -131,7 +131,9 @@ void render(const SurfaceList &surfaces, const std::vector<Light> &lights,
     int image_height = camera.image_height;
 
     tmath::vec3f origin = camera.position;
-    tmath::vec3f right = tmath::normalize(tmath::cross(camera.gaze, camera.up));
+    tmath::vec3f gaze = tmath::normalize(camera.gaze);
+    tmath::vec3f right = tmath::normalize(tmath::cross(gaze, camera.up));
+    tmath::vec3f up = tmath::cross(right, gaze);
 
     float l, r, b, t;
     l = camera.near_plane.x;
@@ -139,7 +141,7 @@ void render(const SurfaceList &surfaces, const std::vector<Light> &lights,
     b = camera.near_plane.z;
     t = camera.near_plane.w;
 
-    tmath::vec3f top_left = origin + camera.near_distance * camera.gaze + l * right + t * camera.up;
+    tmath::vec3f top_left = origin + camera.near_distance * gaze + l * right + t * up;
 
     float rl = r - l;
     float tb = t - b;
@@ -152,7 +154,7 @@ void render(const SurfaceList &surfaces, const std::vector<Light> &lights,
             float su = (rl * (x + 0.5f)) / image_width;
             float sv = (tb * (y + 0.5f)) / image_height;
 
-            Ray r(origin, tmath::normalize((top_left + su * right - sv * camera.up) - origin));
+            Ray r(origin, tmath::normalize((top_left + su * right - sv * up) - origin));
             tmath::vec3f value = tmath::clamp(
                 cast_ray(r, surfaces, lights, ambient_light, background, epsilon, max_recursion),
                 0.0f, 255.0f);
