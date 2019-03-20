@@ -254,6 +254,8 @@ int main(int argc, char **argv) {
     std::cout << "Render time                    : " << elapsed.count() / 1000.0 << "s\n"
               << "# of ray-triangle tests        : " << Face::test_count << "\n"
               << "# of ray-triangle intersections: " << Face::hit_count << "\n"
+              << "# of ray-sphere tests          : " << Sphere::test_count << "\n"
+              << "# of ray-sphere intersections  : " << Sphere::hit_count << "\n"
               << "# of ray-box tests             : " << Box::test_count << "\n"
               << "# of ray-box intersections     : " << Box::hit_count << std::endl;
     return EXIT_SUCCESS;

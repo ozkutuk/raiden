@@ -54,6 +54,10 @@ class Sphere : public Surface {
     tmath::vec3f center;
     float radius;
     Material material;
+    Box bounding_box;
+
+    static uint64_t test_count;
+    static uint64_t hit_count;
 };
 
 class Face : public Surface {

@@ -11,6 +11,8 @@ uint64_t Face::test_count = 0;
 uint64_t Face::hit_count = 0;
 uint64_t Box::test_count = 0;
 uint64_t Box::hit_count = 0;
+uint64_t Sphere::test_count = 0;
+uint64_t Sphere::hit_count = 0;
 
 Box::Box(tmath::vec3f min_point, tmath::vec3f max_point)
     : min_point(std::move(min_point)), max_point(std::move(max_point)) {
@@ -101,33 +103,39 @@ std::optional<HitRecord> SurfaceList::hit(const Ray &ray) const {
 }
 
 Sphere::Sphere(tmath::vec3f center, float radius, Material material)
-    : center(std::move(center)), radius(radius), material(std::move(material)) {
+    : center(std::move(center)), radius(radius), material(std::move(material)),
+      bounding_box(
+          tmath::vec3f(this->center.x - radius, this->center.y - radius, this->center.z - radius),
+          tmath::vec3f(this->center.x + radius, this->center.y + radius, this->center.z + radius)) {
 }
 
 std::optional<HitRecord> Sphere::hit(const Ray &ray) const {
-    float a = tmath::dot(ray.direction, ray.direction);
-    tmath::vec3f o_minus_c = ray.origin - this->center;
-    float b = 2 * tmath::dot(o_minus_c, ray.direction);
-    float c = tmath::dot(o_minus_c, o_minus_c) - this->radius * this->radius;
+    if (bounding_box.hit(ray)) {
+        test_count += 1;
+        float a = tmath::dot(ray.direction, ray.direction);
+        tmath::vec3f o_minus_c = ray.origin - this->center;
+        float b = 2 * tmath::dot(o_minus_c, ray.direction);
+        float c = tmath::dot(o_minus_c, o_minus_c) - this->radius * this->radius;
 
-    float discriminant = b * b - 4 * a * c;
-    if (discriminant > 0) {
-        float b2a = -b / (2 * a);
-        float sqr2a = std::sqrt(discriminant) / (2 * a);
-        float t = b2a - sqr2a;
-        if (t < 0)
-            t = b2a + sqr2a;
-        // we do not handle both of them being negative, negative
-        // return values are handled as not-intersected anyway
-        if (t > T_MIN && t < T_MAX) {
-            HitRecord hit_record;
-            hit_record.t = t;
-            hit_record.normal = tmath::normalize(ray.at(t) - this->center);
-            hit_record.material = &(this->material);
-            return hit_record;
+        float discriminant = b * b - 4 * a * c;
+        if (discriminant > 0) {
+            float b2a = -b / (2 * a);
+            float sqr2a = std::sqrt(discriminant) / (2 * a);
+            float t = b2a - sqr2a;
+            if (t < 0)
+                t = b2a + sqr2a;
+            // we do not handle both of them being negative, negative
+            // return values are handled as not-intersected anyway
+            if (t > T_MIN && t < T_MAX) {
+                HitRecord hit_record;
+                hit_record.t = t;
+                hit_record.normal = tmath::normalize(ray.at(t) - this->center);
+                hit_record.material = &(this->material);
+                hit_count += 1;
+                return hit_record;
+            }
         }
     }
-
     return {};
 }
 
