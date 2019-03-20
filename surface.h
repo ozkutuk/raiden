@@ -24,6 +24,17 @@ class Surface {
     virtual std::optional<HitRecord> hit(const Ray &ray) const = 0;
 };
 
+class Box {
+  public:
+    explicit Box(tmath::vec3f min_point, tmath::vec3f max_point);
+    Box() = default;
+    bool hit(const Ray &ray) const;
+    void update(const tmath::vec3f &point);
+
+    tmath::vec3f min_point;
+    tmath::vec3f max_point;
+};
+
 class SurfaceList : public Surface {
   public:
     explicit SurfaceList(std::vector<std::unique_ptr<Surface>> surfaces);
@@ -53,9 +64,8 @@ class Triangle : public Surface {
     Material material;
 
     // benchmark stuff
-    static uint64_t test_count; 
-    static uint64_t hit_count; 
-
+    static uint64_t test_count;
+    static uint64_t hit_count;
 };
 
 class Mesh : public Surface {
@@ -65,4 +75,5 @@ class Mesh : public Surface {
 
     std::vector<Triangle> triangles;
     Material material;
+    Box bounding_box;
 };
