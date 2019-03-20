@@ -7,28 +7,35 @@
 #include <utility>
 #include <vector>
 
-uint64_t Triangle::test_count = 0;
-uint64_t Triangle::hit_count = 0;
+uint64_t Face::test_count = 0;
+uint64_t Face::hit_count = 0;
+uint64_t Box::test_count = 0;
+uint64_t Box::hit_count = 0;
 
 Box::Box(tmath::vec3f min_point, tmath::vec3f max_point)
     : min_point(std::move(min_point)), max_point(std::move(max_point)) {
 }
 
 bool Box::hit(const Ray &ray) const {
-    float tmin, tmax, tymin, tymax, tzmin, tzmax;
-    if (ray.direction.x >= 0) {
-        tmin = (min_point.x - ray.origin.x) / ray.direction.x;
-        tmax = (max_point.x - ray.origin.x) / ray.direction.x;
+    float tmin, tmax, tymin, tymax, tzmin, tzmax, divx, divy, divz;
+
+    test_count += 1;
+    divx = 1 / ray.direction.x;
+    if (divx >= 0) {
+        tmin = (min_point.x - ray.origin.x) * divx;
+        tmax = (max_point.x - ray.origin.x) * divx;
     } else {
-        tmin = (max_point.x - ray.origin.x) / ray.direction.x;
-        tmax = (min_point.x - ray.origin.x) / ray.direction.x;
+        tmin = (max_point.x - ray.origin.x) * divx;
+        tmax = (min_point.x - ray.origin.x) * divx;
     }
-    if (ray.direction.y >= 0) {
-        tymin = (min_point.y - ray.origin.y) / ray.direction.y;
-        tymax = (max_point.y - ray.origin.y) / ray.direction.y;
+
+    divy = 1 / ray.direction.y;
+    if (divy >= 0) {
+        tymin = (min_point.y - ray.origin.y) * divy;
+        tymax = (max_point.y - ray.origin.y) * divy;
     } else {
-        tymin = (max_point.y - ray.origin.y) / ray.direction.y;
-        tymax = (min_point.y - ray.origin.y) / ray.direction.y;
+        tymin = (max_point.y - ray.origin.y) * divy;
+        tymax = (min_point.y - ray.origin.y) * divy;
     }
     if ((tmin > tymax) || (tymin > tmax))
         return false;
@@ -36,12 +43,14 @@ bool Box::hit(const Ray &ray) const {
         tmin = tymin;
     if (tymax < tmax)
         tmax = tymax;
-    if (ray.direction.z >= 0) {
-        tzmin = (min_point.z - ray.origin.z) / ray.direction.z;
-        tzmax = (max_point.z - ray.origin.z) / ray.direction.z;
+
+    divz = 1 / ray.direction.z;
+    if (divz >= 0) {
+        tzmin = (min_point.z - ray.origin.z) * divz;
+        tzmax = (max_point.z - ray.origin.z) * divz;
     } else {
-        tzmin = (max_point.z - ray.origin.z) / ray.direction.z;
-        tzmax = (min_point.z - ray.origin.z) / ray.direction.z;
+        tzmin = (max_point.z - ray.origin.z) * divz;
+        tzmax = (min_point.z - ray.origin.z) * divz;
     }
     if ((tmin > tzmax) || (tzmin > tmax))
         return false;
@@ -49,7 +58,12 @@ bool Box::hit(const Ray &ray) const {
         tmin = tzmin;
     if (tzmax < tmax)
         tmax = tzmax;
-    return ((tmin < T_MAX) && (tmax > T_MIN));
+
+    if ((tmin < T_MAX) && (tmax > T_MIN)) {
+        hit_count += 1;
+        return true;
+    }
+    return false;
 }
 
 void Box::update(const tmath::vec3f &point) {
@@ -117,11 +131,15 @@ std::optional<HitRecord> Sphere::hit(const Ray &ray) const {
     return {};
 }
 
-Triangle::Triangle(tmath::vec3f v1, tmath::vec3f v2, tmath::vec3f v3, Material material)
-    : v1(std::move(v1)), v2(std::move(v2)), v3(std::move(v3)), material(std::move(material)) {
+Face::Face(tmath::vec3f v1, tmath::vec3f v2, tmath::vec3f v3)
+    : v1(std::move(v1)), v2(std::move(v2)), v3(std::move(v3)) {
 }
 
-std::optional<HitRecord> Triangle::hit(const Ray &ray) const {
+Triangle::Triangle(Face face, Material material)
+    : face(std::move(face)), material(std::move(material)) {
+}
+
+std::optional<HitRecord> Face::hit(const Ray &ray) const {
     // [ a d g ][ beta  ]   [ j ]
     // [ b e h ][ gamma ] = [ k ]
     // [ c f i ][   t   ]   [ l ]
@@ -168,7 +186,8 @@ std::optional<HitRecord> Triangle::hit(const Ray &ray) const {
         HitRecord hit_record;
         hit_record.t = t;
         hit_record.normal = tmath::normalize(tmath::cross(v2 - v1, v3 - v1));
-        hit_record.material = &(this->material);
+        // material to be set on parent object
+        hit_record.material = nullptr;
         hit_count += 1;
         return hit_record;
     }
@@ -176,7 +195,13 @@ std::optional<HitRecord> Triangle::hit(const Ray &ray) const {
     return {};
 }
 
-Mesh::Mesh(std::vector<Triangle> triangles, Material material)
+std::optional<HitRecord> Triangle::hit(const Ray &ray) const {
+    auto hit_record = face.hit(ray);
+    hit_record->material = &(this->material);
+    return hit_record;
+}
+
+Mesh::Mesh(std::vector<Face> triangles, Material material)
     : triangles(std::move(triangles)), material(std::move(material)) {
 
     for (const auto &triangle : this->triangles) {
@@ -199,6 +224,7 @@ std::optional<HitRecord> Mesh::hit(const Ray &ray) const {
         }
     }
 
+    hit_record->material = &(this->material);
     return hit_record;
 }
 

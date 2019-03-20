@@ -33,6 +33,9 @@ class Box {
 
     tmath::vec3f min_point;
     tmath::vec3f max_point;
+
+    static uint64_t test_count;
+    static uint64_t hit_count;
 };
 
 class SurfaceList : public Surface {
@@ -53,27 +56,36 @@ class Sphere : public Surface {
     Material material;
 };
 
-class Triangle : public Surface {
+class Face : public Surface {
   public:
-    explicit Triangle(tmath::vec3f v1, tmath::vec3f v2, tmath::vec3f v3, Material material);
+    explicit Face(tmath::vec3f v1, tmath::vec3f v2, tmath::vec3f v3);
     std::optional<HitRecord> hit(const Ray &ray) const override;
+    Face() = delete;
 
     tmath::vec3f v1;
     tmath::vec3f v2;
     tmath::vec3f v3;
-    Material material;
 
     // benchmark stuff
     static uint64_t test_count;
     static uint64_t hit_count;
 };
 
-class Mesh : public Surface {
+class Triangle : public Surface {
   public:
-    explicit Mesh(std::vector<Triangle> triangles, Material material);
+    explicit Triangle(Face face, Material material);
     std::optional<HitRecord> hit(const Ray &ray) const override;
 
-    std::vector<Triangle> triangles;
+    Face face;
+    Material material;
+};
+
+class Mesh : public Surface {
+  public:
+    explicit Mesh(std::vector<Face> triangles, Material material);
+    std::optional<HitRecord> hit(const Ray &ray) const override;
+
+    std::vector<Face> triangles;
     Material material;
     Box bounding_box;
 };

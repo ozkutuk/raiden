@@ -208,14 +208,13 @@ int main(int argc, char **argv) {
                    scene.materials[triangle.material_id - 1].refractive_index,
                    scene.materials[triangle.material_id - 1].transparency);
         std::unique_ptr<Surface> s =
-            std::make_unique<Triangle>(scene.vertex_data[triangle.indices.v0_id - 1],
-                                       scene.vertex_data[triangle.indices.v1_id - 1],
-                                       scene.vertex_data[triangle.indices.v2_id - 1], m);
+            std::make_unique<Triangle>(Face(scene.vertex_data[triangle.indices.v0_id - 1],
+                                            scene.vertex_data[triangle.indices.v1_id - 1],
+                                            scene.vertex_data[triangle.indices.v2_id - 1]),
+                                       m);
         surface_vector.emplace_back(std::move(s));
     }
 
-    std::vector<Triangle> triangles;
-    // TODO: remove duplicate materials from each triangle, one for a mesh is enough
     for (const auto &mesh : scene.meshes) {
         Material m(scene.materials[mesh.material_id - 1].diffuse,
                    scene.materials[mesh.material_id - 1].specular,
@@ -225,13 +224,13 @@ int main(int argc, char **argv) {
                    scene.materials[mesh.material_id - 1].refractive_index,
                    scene.materials[mesh.material_id - 1].transparency);
 
+        std::vector<Face> faces;
         for (const auto &face : mesh.faces) {
-            triangles.emplace_back(Triangle(scene.vertex_data[face.v0_id - 1],
-                                            scene.vertex_data[face.v1_id - 1],
-                                            scene.vertex_data[face.v2_id - 1], m));
+            faces.emplace_back(scene.vertex_data[face.v0_id - 1], scene.vertex_data[face.v1_id - 1],
+                               scene.vertex_data[face.v2_id - 1]);
         }
 
-        std::unique_ptr<Surface> s = std::make_unique<Mesh>(triangles, m);
+        std::unique_ptr<Surface> s = std::make_unique<Mesh>(faces, m);
         surface_vector.emplace_back(std::move(s));
     }
 
@@ -253,7 +252,9 @@ int main(int argc, char **argv) {
         std::chrono::high_resolution_clock::now() - start);
 
     std::cout << "Render time                    : " << elapsed.count() / 1000.0 << "s\n"
-              << "# of ray-triangle tests        : " << Triangle::test_count << "\n"
-              << "# of ray-triangle intersections: " << Triangle::hit_count << std::endl;
+              << "# of ray-triangle tests        : " << Face::test_count << "\n"
+              << "# of ray-triangle intersections: " << Face::hit_count << "\n"
+              << "# of ray-box tests             : " << Box::test_count << "\n"
+              << "# of ray-box intersections     : " << Box::hit_count << std::endl;
     return EXIT_SUCCESS;
 }
