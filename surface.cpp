@@ -269,8 +269,13 @@ inline Axis next_axis(Axis axis) {
 
 std::optional<HitRecord> BVH::hit(const Ray &ray) const {
     if (bounding_box.hit(ray)) {
-        auto right_hit = right->hit(ray);
-        auto left_hit = left->hit(ray);
+        std::optional<HitRecord> right_hit;
+        std::optional<HitRecord> left_hit;
+
+        if (right)
+            right_hit = right->hit(ray);
+        if (left)
+            left_hit = left->hit(ray);
 
         if (left_hit && right_hit) {
             if (right_hit->t < left_hit->t)
@@ -294,7 +299,7 @@ BVH::BVH(const std::vector<std::shared_ptr<Surface>> &surfaces, Axis axis) {
     std::size_t len = surfaces.size();
     if (len == 1) {
         left = surfaces[0];
-        right = surfaces[0]; // to avoid nullptr checks
+        right = nullptr;
         bounding_box = left->bounding_box;
     } else if (len == 2) {
         left = surfaces[0];
