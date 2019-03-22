@@ -234,30 +234,32 @@ std::optional<HitRecord> Triangle::hit(const Ray &ray) const {
     return hit_record;
 }
 
-Mesh::Mesh(std::vector<Face> triangles, Material material)
+// TODO: possibly add axis as argument
+Mesh::Mesh(std::vector<std::shared_ptr<Face>> triangles, Material material)
     : triangles(std::move(triangles)), material(std::move(material)) {
 
     for (const auto &triangle : this->triangles) {
-        bounding_box.update(triangle.v1);
-        bounding_box.update(triangle.v2);
-        bounding_box.update(triangle.v3);
+        bounding_box.update(triangle->v1);
+        bounding_box.update(triangle->v2);
+        bounding_box.update(triangle->v3);
     }
+
+    std::vector<std::shared_ptr<Surface>> faces(this->triangles.begin(), this->triangles.end());
+    bvh = BVH(faces, Axis::X);
 }
 
 std::optional<HitRecord> Mesh::hit(const Ray &ray) const {
     float t = std::numeric_limits<float>::max();
     std::optional<HitRecord> hit_record;
-    if (bounding_box.hit(ray)) {
-        for (const auto &triangle : triangles) {
-            auto intersected = triangle.hit(ray);
-            if (intersected && intersected->t < t) {
-                hit_record = intersected;
-                t = intersected->t;
-            }
-        }
+
+    auto intersected = bvh.hit(ray);
+    if (intersected && intersected->t < t) {
+        hit_record = intersected;
+        t = intersected->t;
+        hit_record->material = &(this->material);
     }
 
-    hit_record->material = &(this->material);
+
     return hit_record;
 }
 

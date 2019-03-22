@@ -60,6 +60,7 @@ enum class Axis {
 class BVH : public Surface {
   public:
     explicit BVH(const std::vector<std::shared_ptr<Surface>> &surfaces, Axis axis);
+    BVH() = default;
     std::optional<HitRecord> hit(const Ray &ray) const override;
     
     std::shared_ptr<Surface> left;
@@ -105,9 +106,10 @@ class Triangle : public Surface {
 
 class Mesh : public Surface {
   public:
-    explicit Mesh(std::vector<Face> triangles, Material material);
+    explicit Mesh(std::vector<std::shared_ptr<Face>> triangles, Material material);
     std::optional<HitRecord> hit(const Ray &ray) const override;
 
-    std::vector<Face> triangles;
+    std::vector<std::shared_ptr<Face>> triangles;
     Material material;
+    BVH bvh;
 };

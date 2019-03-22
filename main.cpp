@@ -224,10 +224,11 @@ int main(int argc, char **argv) {
                    scene.materials[mesh.material_id - 1].refractive_index,
                    scene.materials[mesh.material_id - 1].transparency);
 
-        std::vector<Face> faces;
+        std::vector<std::shared_ptr<Face>> faces;
         for (const auto &face : mesh.faces) {
-            faces.emplace_back(scene.vertex_data[face.v0_id - 1], scene.vertex_data[face.v1_id - 1],
-                               scene.vertex_data[face.v2_id - 1]);
+            faces.emplace_back(std::make_shared<Face>(scene.vertex_data[face.v0_id - 1],
+                                                      scene.vertex_data[face.v1_id - 1],
+                                                      scene.vertex_data[face.v2_id - 1]));
         }
 
         std::shared_ptr<Surface> s = std::make_shared<Mesh>(faces, m);
@@ -246,8 +247,8 @@ int main(int argc, char **argv) {
     }
 
     for (const auto &camera : scene.cameras)
-        render(bvh, lights, scene.ambient_light, scene.background_color,
-               scene.shadow_ray_epsilon, scene.max_recursion_depth, camera);
+        render(bvh, lights, scene.ambient_light, scene.background_color, scene.shadow_ray_epsilon,
+               scene.max_recursion_depth, camera);
 
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::high_resolution_clock::now() - start);
