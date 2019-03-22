@@ -39,7 +39,7 @@ float fresnel_reflection(const tmath::vec3f &incident, const tmath::vec3f &norma
     return r;
 }
 
-tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::vector<Light> &lights,
+tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Light> &lights,
                       const tmath::vec3f &ambient_light, const tmath::vec3f &background,
                       float epsilon, int recursion_depth) {
 
@@ -126,7 +126,7 @@ tmath::vec3f cast_ray(const Ray &ray, const SurfaceList &surfaces, const std::ve
     return total_light;
 }
 
-void render(const SurfaceList &surfaces, const std::vector<Light> &lights,
+void render(const BVH &surfaces, const std::vector<Light> &lights,
             const tmath::vec3f &ambient_light, const tmath::vec3f &background, float epsilon,
             int max_recursion, const parser::Camera &camera) {
     int image_width = camera.image_width;
@@ -185,7 +185,7 @@ int main(int argc, char **argv) {
     parser::Scene scene;
     scene.loadFromXml(argv[1]);
 
-    std::vector<std::unique_ptr<Surface>> surface_vector;
+    std::vector<std::shared_ptr<Surface>> surface_vector;
     for (const auto &sphere : scene.spheres) {
         Material m(scene.materials[sphere.material_id - 1].diffuse,
                    scene.materials[sphere.material_id - 1].specular,
@@ -194,7 +194,7 @@ int main(int argc, char **argv) {
                    scene.materials[sphere.material_id - 1].phong_exponent,
                    scene.materials[sphere.material_id - 1].refractive_index,
                    scene.materials[sphere.material_id - 1].transparency);
-        std::unique_ptr<Surface> s = std::make_unique<Sphere>(
+        std::shared_ptr<Surface> s = std::make_shared<Sphere>(
             scene.vertex_data[sphere.center_vertex_id - 1], sphere.radius, m);
         surface_vector.emplace_back(std::move(s));
     }
@@ -207,8 +207,8 @@ int main(int argc, char **argv) {
                    scene.materials[triangle.material_id - 1].phong_exponent,
                    scene.materials[triangle.material_id - 1].refractive_index,
                    scene.materials[triangle.material_id - 1].transparency);
-        std::unique_ptr<Surface> s =
-            std::make_unique<Triangle>(Face(scene.vertex_data[triangle.indices.v0_id - 1],
+        std::shared_ptr<Surface> s =
+            std::make_shared<Triangle>(Face(scene.vertex_data[triangle.indices.v0_id - 1],
                                             scene.vertex_data[triangle.indices.v1_id - 1],
                                             scene.vertex_data[triangle.indices.v2_id - 1]),
                                        m);
@@ -230,11 +230,12 @@ int main(int argc, char **argv) {
                                scene.vertex_data[face.v2_id - 1]);
         }
 
-        std::unique_ptr<Surface> s = std::make_unique<Mesh>(faces, m);
+        std::shared_ptr<Surface> s = std::make_shared<Mesh>(faces, m);
         surface_vector.emplace_back(std::move(s));
     }
 
     SurfaceList surfaces(std::move(surface_vector));
+    BVH bvh(surfaces.surfaces, Axis::X);
 
     std::vector<Light> lights;
     for (const auto &light : scene.point_lights) {
@@ -245,7 +246,7 @@ int main(int argc, char **argv) {
     }
 
     for (const auto &camera : scene.cameras)
-        render(surfaces, lights, scene.ambient_light, scene.background_color,
+        render(bvh, lights, scene.ambient_light, scene.background_color,
                scene.shadow_ray_epsilon, scene.max_recursion_depth, camera);
 
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(

@@ -14,8 +14,22 @@ uint64_t Box::hit_count = 0;
 uint64_t Sphere::test_count = 0;
 uint64_t Sphere::hit_count = 0;
 
+Box::Box()
+    : min_point(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
+                std::numeric_limits<float>::max()),
+      max_point(std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(),
+                   std::numeric_limits<float>::lowest()) {
+}
+
 Box::Box(tmath::vec3f min_point, tmath::vec3f max_point)
     : min_point(std::move(min_point)), max_point(std::move(max_point)) {
+}
+
+Box::Box(const Box &left, const Box &right) : Box() {
+    update(left.min_point);
+    update(left.max_point);
+    update(right.min_point);
+    update(right.max_point);
 }
 
 bool Box::hit(const Ray &ray) const {
@@ -84,7 +98,10 @@ void Box::update(const tmath::vec3f &point) {
         max_point.z = point.z;
 }
 
-SurfaceList::SurfaceList(std::vector<std::unique_ptr<Surface>> surfaces)
+Surface::Surface(Box bounding_box) : bounding_box(std::move(bounding_box)) {
+}
+
+SurfaceList::SurfaceList(std::vector<std::shared_ptr<Surface>> surfaces)
     : surfaces(std::move(surfaces)) {
 }
 
@@ -103,10 +120,9 @@ std::optional<HitRecord> SurfaceList::hit(const Ray &ray) const {
 }
 
 Sphere::Sphere(tmath::vec3f center, float radius, Material material)
-    : center(std::move(center)), radius(radius), material(std::move(material)),
-      bounding_box(
-          tmath::vec3f(this->center.x - radius, this->center.y - radius, this->center.z - radius),
-          tmath::vec3f(this->center.x + radius, this->center.y + radius, this->center.z + radius)) {
+    : Surface(Box(tmath::vec3f(center.x - radius, center.y - radius, center.z - radius),
+                  tmath::vec3f(center.x + radius, center.y + radius, center.z + radius))),
+      center(std::move(center)), radius(radius), material(std::move(material)) {
 }
 
 std::optional<HitRecord> Sphere::hit(const Ray &ray) const {
@@ -141,10 +157,19 @@ std::optional<HitRecord> Sphere::hit(const Ray &ray) const {
 
 Face::Face(tmath::vec3f v1, tmath::vec3f v2, tmath::vec3f v3)
     : v1(std::move(v1)), v2(std::move(v2)), v3(std::move(v3)) {
+
+    bounding_box.update(v1);
+    bounding_box.update(v2);
+    bounding_box.update(v3);
 }
 
 Triangle::Triangle(Face face, Material material)
     : face(std::move(face)), material(std::move(material)) {
+
+    // TODO: Bounding box is duplicate between face and triangle
+    bounding_box.update(face.v1);
+    bounding_box.update(face.v2);
+    bounding_box.update(face.v3);
 }
 
 std::optional<HitRecord> Face::hit(const Ray &ray) const {
@@ -234,5 +259,57 @@ std::optional<HitRecord> Mesh::hit(const Ray &ray) const {
 
     hit_record->material = &(this->material);
     return hit_record;
+}
+
+inline Axis next_axis(Axis axis) {
+    return Axis((static_cast<int>(axis) + 1) % 3);
+}
+
+std::optional<HitRecord> BVH::hit(const Ray &ray) const {
+    if (bounding_box.hit(ray)) {
+        auto right_hit = right->hit(ray);
+        auto left_hit = left->hit(ray);
+
+        if (left_hit && right_hit) {
+            if (right_hit->t < left_hit->t)
+                return right_hit;
+            else
+                return left_hit;
+        }
+
+        if (left_hit)
+            return left_hit;
+
+        if (right_hit)
+            return right_hit;
+    }
+
+    return {};
+}
+
+BVH::BVH(const std::vector<std::shared_ptr<Surface>> &surfaces, Axis axis) {
+    // TODO: implement Axis stuff
+    std::size_t len = surfaces.size();
+    if (len == 1) {
+        left = surfaces[0];
+        right = surfaces[0]; // to avoid nullptr checks
+        bounding_box = left->bounding_box;
+    } else if (len == 2) {
+        left = surfaces[0];
+        right = surfaces[1];
+        bounding_box = Box(left->bounding_box, right->bounding_box);
+    } else {
+        for (const auto &surface : surfaces) {
+            bounding_box.update(surface->bounding_box.min_point);
+            bounding_box.update(surface->bounding_box.max_point);
+        }
+        std::size_t half_len = len / 2;
+        std::vector<std::shared_ptr<Surface>> left_surfaces(surfaces.begin(),
+                                                            surfaces.begin() + half_len);
+        std::vector<std::shared_ptr<Surface>> right_surfaces(surfaces.begin() + half_len,
+                                                             surfaces.end());
+        left = std::make_shared<BVH>(left_surfaces, next_axis(axis));
+        right = std::make_shared<BVH>(right_surfaces, next_axis(axis));
+    }
 }
 

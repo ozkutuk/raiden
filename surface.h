@@ -19,15 +19,11 @@ class HitRecord {
     const Material *material;
 };
 
-class Surface {
-  public:
-    virtual std::optional<HitRecord> hit(const Ray &ray) const = 0;
-};
-
 class Box {
   public:
     explicit Box(tmath::vec3f min_point, tmath::vec3f max_point);
-    Box() = default;
+    explicit Box(const Box &left, const Box &right);
+    Box();
     bool hit(const Ray &ray) const;
     void update(const tmath::vec3f &point);
 
@@ -38,12 +34,36 @@ class Box {
     static uint64_t hit_count;
 };
 
+class Surface {
+  public:
+    explicit Surface(Box bounding_box);
+    Surface() = default;
+    virtual std::optional<HitRecord> hit(const Ray &ray) const = 0;
+
+    Box bounding_box;
+};
+
 class SurfaceList : public Surface {
   public:
-    explicit SurfaceList(std::vector<std::unique_ptr<Surface>> surfaces);
+    explicit SurfaceList(std::vector<std::shared_ptr<Surface>> surfaces);
     std::optional<HitRecord> hit(const Ray &ray) const override;
 
-    std::vector<std::unique_ptr<Surface>> surfaces;
+    std::vector<std::shared_ptr<Surface>> surfaces;
+};
+
+enum class Axis {
+    X,
+    Y,
+    Z
+};
+
+class BVH : public Surface {
+  public:
+    explicit BVH(const std::vector<std::shared_ptr<Surface>> &surfaces, Axis axis);
+    std::optional<HitRecord> hit(const Ray &ray) const override;
+    
+    std::shared_ptr<Surface> left;
+    std::shared_ptr<Surface> right;
 };
 
 class Sphere : public Surface {
@@ -54,7 +74,6 @@ class Sphere : public Surface {
     tmath::vec3f center;
     float radius;
     Material material;
-    Box bounding_box;
 
     static uint64_t test_count;
     static uint64_t hit_count;
@@ -91,5 +110,4 @@ class Mesh : public Surface {
 
     std::vector<Face> triangles;
     Material material;
-    Box bounding_box;
 };
