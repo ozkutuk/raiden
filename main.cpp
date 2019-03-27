@@ -126,6 +126,10 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
     return total_light;
 }
 
+inline double mrandom() {
+    return ((double)rand() / (RAND_MAX));
+}
+
 void render(const BVH &surfaces, const std::vector<Light> &lights,
             const tmath::vec3f &ambient_light, const tmath::vec3f &background, float epsilon,
             int max_recursion, const parser::Camera &camera) {
@@ -150,16 +154,30 @@ void render(const BVH &surfaces, const std::vector<Light> &lights,
 
     std::vector<Color> image(image_width * image_height);
 
+    srand(time(0));
     for (int y = 0; y < image_height; y++) {
         for (int x = 0; x < image_width; x++) {
 
-            float su = (rl * (x + 0.5f)) / image_width;
-            float sv = (tb * (y + 0.5f)) / image_height;
+            float su = rl / image_width;
+            float sv = tb / image_height;
 
-            Ray r(origin, tmath::normalize((top_left + su * right - sv * up) - origin));
-            tmath::vec3f value = tmath::clamp(
-                cast_ray(r, surfaces, lights, ambient_light, background, epsilon, max_recursion),
-                0.0f, 255.0f);
+            const int n_samples = 9;
+            const float bin_dimension = 1.0f / std::sqrt(n_samples);
+            tmath::vec3f value;
+            for (int sub_y = 0; sub_y < std::sqrt(n_samples); sub_y++) {
+                for (int sub_x = 0; sub_x < std::sqrt(n_samples); sub_x++) {
+                    float ray_x = su * (x + (sub_x + mrandom()) * bin_dimension);
+                    float ray_y = sv * (y + (sub_y + mrandom()) * bin_dimension);
+
+                    Ray r(origin,
+                          tmath::normalize((top_left + ray_x * right - ray_y * up) - origin));
+                    value += cast_ray(r, surfaces, lights, ambient_light, background, epsilon,
+                                      max_recursion);
+                }
+            }
+
+            value = tmath::clamp(value / n_samples, 0.0f, 255.0f);
+
             Color c;
             c.r = static_cast<uint8_t>(value.x);
             c.g = static_cast<uint8_t>(value.y);
