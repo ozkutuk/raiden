@@ -6,6 +6,7 @@
 #include <cmath>
 #include <utility>
 #include <vector>
+#include <algorithm>
 
 uint64_t Face::test_count = 0;
 uint64_t Face::hit_count = 0;
@@ -18,7 +19,7 @@ Box::Box()
     : min_point(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
                 std::numeric_limits<float>::max()),
       max_point(std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(),
-                   std::numeric_limits<float>::lowest()) {
+                std::numeric_limits<float>::lowest()) {
 }
 
 Box::Box(tmath::vec3f min_point, tmath::vec3f max_point)
@@ -259,7 +260,6 @@ std::optional<HitRecord> Mesh::hit(const Ray &ray) const {
         hit_record->material = &(this->material);
     }
 
-
     return hit_record;
 }
 
@@ -311,10 +311,32 @@ BVH::BVH(const std::vector<std::shared_ptr<Surface>> &surfaces, Axis axis) {
             bounding_box.update(surface->bounding_box.max_point);
         }
         std::size_t half_len = len / 2;
-        std::vector<std::shared_ptr<Surface>> left_surfaces(surfaces.begin(),
-                                                            surfaces.begin() + half_len);
-        std::vector<std::shared_ptr<Surface>> right_surfaces(surfaces.begin() + half_len,
-                                                             surfaces.end());
+
+        auto surfaces_copy = surfaces;
+        std::sort(surfaces_copy.begin(), surfaces_copy.end(),
+                  [axis](std::shared_ptr<Surface> s1, std::shared_ptr<Surface> s2) {
+
+                      auto s1_midpoint = (s1->bounding_box.min_point + s1->bounding_box.max_point) / 2;
+                      auto s2_midpoint = (s2->bounding_box.min_point + s2->bounding_box.max_point) / 2;
+
+                      float s1_mid, s2_mid;
+                      if (axis == Axis::X) {
+                          s1_mid = s1_midpoint.x;
+                          s2_mid = s2_midpoint.x;
+                      } else if (axis == Axis::Y) {
+                          s1_mid = s1_midpoint.y;
+                          s2_mid = s2_midpoint.y;
+                      } else {
+                          s1_mid = s1_midpoint.z;
+                          s2_mid = s2_midpoint.z;
+                      }
+
+                      return s1_mid < s2_mid;
+                  });
+        std::vector<std::shared_ptr<Surface>> left_surfaces(surfaces_copy.begin(),
+                                                            surfaces_copy.begin() + half_len);
+        std::vector<std::shared_ptr<Surface>> right_surfaces(surfaces_copy.begin() + half_len,
+                                                             surfaces_copy.end());
         left = std::make_shared<BVH>(left_surfaces, next_axis(axis));
         right = std::make_shared<BVH>(right_surfaces, next_axis(axis));
     }
