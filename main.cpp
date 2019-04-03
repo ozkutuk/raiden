@@ -138,7 +138,7 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
             float u_offset = -(blur_window / 2.0f) + blur_window * mrandom();
             float v_offset = -(blur_window / 2.0f) + blur_window * mrandom();
 
-            reflected_direction = reflected_direction + u_offset * u + v_offset * v;
+            reflected_direction = tmath::normalize(reflected_direction + u_offset * u + v_offset * v);
         }
 
         Ray reflected(hit_point + epsilon * normal, reflected_direction);
@@ -172,7 +172,7 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
             float u_offset = -(blur_window / 2.0f) + blur_window * mrandom();
             float v_offset = -(blur_window / 2.0f) + blur_window * mrandom();
 
-            reflected_direction = reflected_direction + u_offset * u + v_offset * v;
+            reflected_direction = tmath::normalize(reflected_direction + u_offset * u + v_offset * v);
         }
 
         Ray reflected(hit_point + epsilon * normal, reflected_direction);
