@@ -9,11 +9,13 @@
 #include "stb_image_write.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <tuple>
 #include <vector>
 
 #include "parser.h"
@@ -32,11 +34,44 @@ struct Light {
     tmath::vec3f position;
 };
 
+inline double mrandom() {
+    return ((double)rand() / (RAND_MAX));
+}
+
 float fresnel_reflection(const tmath::vec3f &incident, const tmath::vec3f &normal, float eta) {
     float cos_theta = std::abs(tmath::dot(incident, normal));
     float r_0 = ((eta - 1.0f) * (eta - 1.0f)) / ((eta + 1.0f) * (eta + 1.0f));
     float r = r_0 + (1.0f - r_0) * std::pow(1.0f - cos_theta, 5);
     return r;
+}
+
+std::tuple<tmath::vec3f, tmath::vec3f, tmath::vec3f> orthonormal_basis(const tmath::vec3f &vec) {
+    tmath::vec3f w = tmath::normalize(vec);
+    tmath::vec3f not_colinear = w;
+
+    std::array<float, 3> magnitudes = {std::abs(not_colinear.x), std::abs(not_colinear.y),
+                                       std::abs(not_colinear.z)};
+
+    auto min_element = std::min_element(std::begin(magnitudes), std::end(magnitudes));
+    std::size_t min_index = std::distance(std::begin(magnitudes), min_element);
+
+    if (min_index == 0)
+        not_colinear.x = 1.0f;
+    else if (min_index == 1)
+        not_colinear.y = 1.0f;
+    else
+        not_colinear.z = 1.0f;
+
+    tmath::vec3f u = tmath::normalize(tmath::cross(not_colinear, w));
+    tmath::vec3f v = tmath::cross(w, u);
+
+    return {u, v, w};
+}
+
+tmath::vec3f to_canonical(const std::tuple<tmath::vec3f, tmath::vec3f, tmath::vec3f> &basis,
+                          tmath::vec3f point) {
+    auto [u, v, w] = basis;
+    return tmath::vec3f(tmath::dot(u, point), tmath::dot(v, point), tmath::dot(w, point));
 }
 
 tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Light> &lights,
@@ -81,6 +116,9 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
     total_light += intersected->material->diffuse * diffuse_light_intensity +
                    intersected->material->specular * specular_light_intensity;
 
+    const bool glossy = true;
+    const float blur_window = 0.5f;
+
     if (intersected->material->refractive_index != 0 && recursion_depth > 0) {
         tmath::vec3f dir = -1.0f * to_eye;
         bool outside = tmath::dot(normal, dir) < 0;
@@ -92,7 +130,18 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
 
         Ray refracted(origin,
                       tmath::refract2(dir, normal, intersected->material->refractive_index));
-        Ray reflected(hit_point + epsilon * normal, tmath::reflect(-1.0f * to_eye, normal));
+
+        auto reflected_direction = tmath::reflect(-1.0f * to_eye, normal);
+        if (glossy) {
+            auto [u, v, w] = orthonormal_basis(reflected_direction);
+
+            float u_offset = -(blur_window / 2.0f) + blur_window * mrandom();
+            float v_offset = -(blur_window / 2.0f) + blur_window * mrandom();
+
+            reflected_direction = reflected_direction + u_offset * u + v_offset * v;
+        }
+
+        Ray reflected(hit_point + epsilon * normal, reflected_direction);
 
         float reflection = fresnel_reflection(dir, normal, intersected->material->refractive_index);
         float refraction = 1.0f - reflection;
@@ -115,7 +164,19 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
     }
 
     else if (tmath::length(intersected->material->mirror_reflectance) != 0 && recursion_depth > 0) {
-        Ray reflected(hit_point + epsilon * normal, tmath::reflect(-1.0f * to_eye, normal));
+
+        auto reflected_direction = tmath::reflect(-1.0f * to_eye, normal);
+        if (glossy) {
+            auto [u, v, w] = orthonormal_basis(reflected_direction);
+
+            float u_offset = -(blur_window / 2.0f) + blur_window * mrandom();
+            float v_offset = -(blur_window / 2.0f) + blur_window * mrandom();
+
+            reflected_direction = reflected_direction + u_offset * u + v_offset * v;
+        }
+
+        Ray reflected(hit_point + epsilon * normal, reflected_direction);
+
         // TODO: get rid of this awful re-calculation
         if (surfaces.hit(reflected))
             total_light += intersected->material->mirror_reflectance *
@@ -124,10 +185,6 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
     }
 
     return total_light;
-}
-
-inline double mrandom() {
-    return ((double)rand() / (RAND_MAX));
 }
 
 void render(const BVH &surfaces, const std::vector<Light> &lights,
@@ -165,7 +222,7 @@ void render(const BVH &surfaces, const std::vector<Light> &lights,
             const float bin_dimension = 1.0f / std::sqrt(n_samples);
             tmath::vec3f value;
 
-            const bool dof = true;
+            const bool dof = false;
 
             if (dof) {
                 float aperture_size = 1.5f;
