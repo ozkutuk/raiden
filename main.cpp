@@ -161,18 +161,51 @@ void render(const BVH &surfaces, const std::vector<Light> &lights,
             float su = rl / image_width;
             float sv = tb / image_height;
 
-            const int n_samples = 9;
+            const int n_samples = 100;
             const float bin_dimension = 1.0f / std::sqrt(n_samples);
             tmath::vec3f value;
-            for (int sub_y = 0; sub_y < std::sqrt(n_samples); sub_y++) {
-                for (int sub_x = 0; sub_x < std::sqrt(n_samples); sub_x++) {
-                    float ray_x = su * (x + (sub_x + mrandom()) * bin_dimension);
-                    float ray_y = sv * (y + (sub_y + mrandom()) * bin_dimension);
 
-                    Ray r(origin,
-                          tmath::normalize((top_left + ray_x * right - ray_y * up) - origin));
-                    value += cast_ray(r, surfaces, lights, ambient_light, background, epsilon,
-                                      max_recursion);
+            const bool dof = true;
+
+            if (dof) {
+                float aperture_size = 1.5f;
+                float focal_distance = 21.0f;
+
+                tmath::vec3f pixel_coordinate =
+                    top_left + (su * (x + 0.5f) * right) - (sv * (y + 0.5f) * up);
+
+                Ray ray_to_pixel(origin, tmath::normalize(pixel_coordinate - origin));
+                tmath::vec3f focal_point = ray_to_pixel.at(focal_distance);
+
+                for (int sub_y = 0; sub_y < std::sqrt(n_samples); sub_y++) {
+                    for (int sub_x = 0; sub_x < std::sqrt(n_samples); sub_x++) {
+                        float lens_origin_x_offset =
+                            aperture_size * (sub_x + mrandom()) * bin_dimension;
+                        float lens_origin_y_offset =
+                            aperture_size * (sub_y + mrandom()) * bin_dimension;
+
+                        tmath::vec3f pixel_top_left =
+                            pixel_coordinate - tmath::vec3f(0.5f, 0.5f, 0.0f);
+                        tmath::vec3f lens_origin = pixel_top_left + lens_origin_x_offset * right -
+                                                   lens_origin_y_offset * up;
+
+                        Ray r(lens_origin, tmath::normalize(focal_point - lens_origin));
+                        value += cast_ray(r, surfaces, lights, ambient_light, background, epsilon,
+                                          max_recursion);
+                    }
+                }
+            } else {
+
+                for (int sub_y = 0; sub_y < std::sqrt(n_samples); sub_y++) {
+                    for (int sub_x = 0; sub_x < std::sqrt(n_samples); sub_x++) {
+                        float ray_x = su * (x + (sub_x + mrandom()) * bin_dimension);
+                        float ray_y = sv * (y + (sub_y + mrandom()) * bin_dimension);
+
+                        Ray r(origin,
+                              tmath::normalize((top_left + ray_x * right - ray_y * up) - origin));
+                        value += cast_ray(r, surfaces, lights, ambient_light, background, epsilon,
+                                          max_recursion);
+                    }
                 }
             }
 
