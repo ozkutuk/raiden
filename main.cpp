@@ -91,10 +91,32 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
     tmath::vec3f normal = intersected->normal;
     tmath::vec3f to_eye = tmath::normalize(ray.origin - hit_point);
     for (const auto &light : lights) {
+        tmath::vec3f light_intensity = light.intensity;
         tmath::vec3f light_vec = light.position - hit_point;
-        float light_distance = tmath::length(light_vec);
-        // calculate this way, because we can reuse the distance
-        tmath::vec3f light_dir = light_vec / light_distance;
+        float light_distance;
+        tmath::vec3f light_dir;
+
+        const bool area_light = true;
+
+        if (!area_light) {
+            // calculate this way, because we can reuse the distance
+            light_distance = tmath::length(light_vec);
+            light_dir = light_vec / light_distance;
+        } else {
+            const float light_size = 3.0f;
+            const tmath::vec3f light_normal = tmath::vec3f(0.0f, -1.0f, 0.0f);
+            // light_intensity *= light_size * light_size;
+            auto [u, v, w] = orthonormal_basis(light_normal);
+
+            float u_offset = -(light_size / 2.0f) + light_size * mrandom();
+            float v_offset = -(light_size / 2.0f) + light_size * mrandom();
+
+            light_dir = light_vec + u_offset * u + v_offset * v;
+            light_distance = tmath::length(light_dir);
+            light_dir = light_dir / light_distance;
+            light_intensity *=
+                std::abs(tmath::dot(light_dir, light_normal)) * light_size * light_size;
+        }
 
         Ray shadow_ray(hit_point + epsilon * normal, light_dir);
         auto shadow_hit = surfaces.hit(shadow_ray);
@@ -102,13 +124,13 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
         if (shadow_hit && shadow_hit->t < light_distance)
             continue;
 
-        diffuse_light_intensity += light.intensity * std::max(0.0f, tmath::dot(light_dir, normal)) /
+        diffuse_light_intensity += light_intensity * std::max(0.0f, tmath::dot(light_dir, normal)) /
                                    (light_distance * light_distance);
 
         // NOTE: this may be calculated without half vector
         tmath::vec3f half = tmath::normalize(light_dir + to_eye);
         float nh_angle = std::max(0.0f, tmath::dot(normal, half));
-        specular_light_intensity += light.intensity *
+        specular_light_intensity += light_intensity *
                                     std::pow(nh_angle, intersected->material->specular_exponent) /
                                     (light_distance * light_distance);
     }
@@ -116,7 +138,7 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
     total_light += intersected->material->diffuse * diffuse_light_intensity +
                    intersected->material->specular * specular_light_intensity;
 
-    const bool glossy = true;
+    const bool glossy = false;
     const float blur_window = 0.5f;
 
     if (intersected->material->refractive_index != 0 && recursion_depth > 0) {
@@ -138,7 +160,8 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
             float u_offset = -(blur_window / 2.0f) + blur_window * mrandom();
             float v_offset = -(blur_window / 2.0f) + blur_window * mrandom();
 
-            reflected_direction = tmath::normalize(reflected_direction + u_offset * u + v_offset * v);
+            reflected_direction =
+                tmath::normalize(reflected_direction + u_offset * u + v_offset * v);
         }
 
         Ray reflected(hit_point + epsilon * normal, reflected_direction);
@@ -172,7 +195,8 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
             float u_offset = -(blur_window / 2.0f) + blur_window * mrandom();
             float v_offset = -(blur_window / 2.0f) + blur_window * mrandom();
 
-            reflected_direction = tmath::normalize(reflected_direction + u_offset * u + v_offset * v);
+            reflected_direction =
+                tmath::normalize(reflected_direction + u_offset * u + v_offset * v);
         }
 
         Ray reflected(hit_point + epsilon * normal, reflected_direction);
