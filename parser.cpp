@@ -77,6 +77,12 @@ void parser::Scene::loadFromXml(const std::string& filepath)
         stream << child->GetText() << std::endl;
         child = element->FirstChildElement("ImageName");
         stream << child->GetText() << std::endl;
+        child = element->FirstChildElement("NumSamples");
+        if (child) {
+            stream << child->GetText() << std::endl;
+        } else {
+            stream << "0" << std::endl;
+        }
 
         stream >> camera.position.x >> camera.position.y >> camera.position.z;
         stream >> camera.gaze.x >> camera.gaze.y >> camera.gaze.z;
@@ -85,6 +91,7 @@ void parser::Scene::loadFromXml(const std::string& filepath)
         stream >> camera.near_distance;
         stream >> camera.image_width >> camera.image_height;
         stream >> camera.image_name;
+        stream >> camera.n_samples;
 
         cameras.push_back(camera);
         element = element->NextSiblingElement("Camera");
