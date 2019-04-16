@@ -295,9 +295,11 @@ std::optional<HitRecord> BVH::hit(const Ray &ray) const {
 }
 
 BVH::BVH(const std::vector<std::shared_ptr<Surface>> &surfaces, Axis axis) {
-    // TODO: implement Axis stuff
     std::size_t len = surfaces.size();
-    if (len == 1) {
+    if (len == 0) {
+        left = nullptr;
+        right = nullptr;
+    } else if (len == 1) {
         left = surfaces[0];
         right = nullptr;
         bounding_box = left->bounding_box;
@@ -310,6 +312,7 @@ BVH::BVH(const std::vector<std::shared_ptr<Surface>> &surfaces, Axis axis) {
             bounding_box.update(surface->bounding_box.min_point);
             bounding_box.update(surface->bounding_box.max_point);
         }
+
         std::size_t half_len = len / 2;
 
         auto surfaces_copy = surfaces;
@@ -337,6 +340,7 @@ BVH::BVH(const std::vector<std::shared_ptr<Surface>> &surfaces, Axis axis) {
                                                             surfaces_copy.begin() + half_len);
         std::vector<std::shared_ptr<Surface>> right_surfaces(surfaces_copy.begin() + half_len,
                                                              surfaces_copy.end());
+
         left = std::make_shared<BVH>(left_surfaces, next_axis(axis));
         right = std::make_shared<BVH>(right_surfaces, next_axis(axis));
     }

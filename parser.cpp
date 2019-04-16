@@ -77,6 +77,25 @@ void parser::Scene::loadFromXml(const std::string& filepath)
         stream << child->GetText() << std::endl;
         child = element->FirstChildElement("ImageName");
         stream << child->GetText() << std::endl;
+        child = element->FirstChildElement("NumSamples");
+        if (child) {
+            stream << child->GetText() << std::endl;
+        } else {
+            stream << "0" << std::endl;
+        }
+        child = element->FirstChildElement("FocusDistance");
+        if (child) {
+            stream << child->GetText() << std::endl;
+        } else {
+            stream << "0" << std::endl; // TODO: 0 may be a valid number for focus
+        }
+        child = element->FirstChildElement("ApertureSize");
+        if (child) {
+            stream << child->GetText() << std::endl;
+        } else {
+            stream << "0" << std::endl; // TODO: 0 may be a valid number for focus
+        }
+
 
         stream >> camera.position.x >> camera.position.y >> camera.position.z;
         stream >> camera.gaze.x >> camera.gaze.y >> camera.gaze.z;
@@ -85,6 +104,9 @@ void parser::Scene::loadFromXml(const std::string& filepath)
         stream >> camera.near_distance;
         stream >> camera.image_width >> camera.image_height;
         stream >> camera.image_name;
+        stream >> camera.n_samples;
+        stream >> camera.focus_distance;
+        stream >> camera.aperture_size;
 
         cameras.push_back(camera);
         element = element->NextSiblingElement("Camera");
@@ -95,20 +117,41 @@ void parser::Scene::loadFromXml(const std::string& filepath)
     auto child = element->FirstChildElement("AmbientLight");
     stream << child->GetText() << std::endl;
     stream >> ambient_light.x >> ambient_light.y >> ambient_light.z;
-    element = element->FirstChildElement("PointLight");
+    auto points = element->FirstChildElement("PointLight");
     PointLight point_light;
-    while (element)
+    while (points)
     {
-        child = element->FirstChildElement("Position");
+        child = points->FirstChildElement("Position");
         stream << child->GetText() << std::endl;
-        child = element->FirstChildElement("Intensity");
+        child = points->FirstChildElement("Intensity");
         stream << child->GetText() << std::endl;
 
         stream >> point_light.position.x >> point_light.position.y >> point_light.position.z;
         stream >> point_light.intensity.x >> point_light.intensity.y >> point_light.intensity.z;
 
         point_lights.push_back(point_light);
-        element = element->NextSiblingElement("PointLight");
+        points = points->NextSiblingElement("PointLight");
+    }
+    auto areas = element->FirstChildElement("AreaLight");
+    AreaLight area_light;
+    while (areas)
+    {
+        child = areas->FirstChildElement("Position");
+        stream << child->GetText() << std::endl;
+        child = areas->FirstChildElement("Radiance");
+        stream << child->GetText() << std::endl;
+        child = areas->FirstChildElement("Normal");
+        stream << child->GetText() << std::endl;
+        child = areas->FirstChildElement("Size");
+        stream << child->GetText() << std::endl;
+
+        stream >> area_light.position.x >> area_light.position.y >> area_light.position.z;
+        stream >> area_light.intensity.x >> area_light.intensity.y >> area_light.intensity.z;
+        stream >> area_light.normal.x >> area_light.normal.y >> area_light.normal.z;
+        stream >> area_light.size;
+
+        area_lights.push_back(area_light);
+        areas = areas->NextSiblingElement("AreaLight");
     }
 
     //Get Materials
@@ -143,6 +186,11 @@ void parser::Scene::loadFromXml(const std::string& filepath)
             stream << child->GetText() << std::endl;
         else
             stream << "1.0 1.0 1.0" << std::endl;
+        child = element->FirstChildElement("Roughness");
+        if (child)
+            stream << child->GetText() << std::endl;
+        else
+            stream << "0.0" << std::endl;
 
         stream >> material.ambient.x >> material.ambient.y >> material.ambient.z;
         stream >> material.diffuse.x >> material.diffuse.y >> material.diffuse.z;
@@ -151,6 +199,7 @@ void parser::Scene::loadFromXml(const std::string& filepath)
         stream >> material.phong_exponent;
         stream >> material.refractive_index;
         stream >> material.transparency.x >> material.transparency.y >> material.transparency.z;
+        stream >> material.roughness;
 
         materials.push_back(material);
         element = element->NextSiblingElement("Material");
