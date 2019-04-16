@@ -250,11 +250,11 @@ void render(const BVH &surfaces, const std::vector<std::unique_ptr<Light>> &ligh
             if (n_samples) {
                 const float bin_dimension = 1.0f / std::sqrt(n_samples);
 
-                const bool dof = false;
+                bool dof = camera.focus_distance != 0;
 
                 if (dof) {
-                    float aperture_size = 1.5f;
-                    float focal_distance = 21.0f;
+                    float aperture_size = camera.aperture_size;
+                    float focal_distance = camera.focus_distance;
 
                     tmath::vec3f pixel_coordinate =
                         top_left + (su * (x + 0.5f) * right) - (sv * (y + 0.5f) * up);

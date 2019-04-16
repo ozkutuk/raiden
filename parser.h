@@ -28,6 +28,8 @@ struct Camera {
     int image_width, image_height;
     std::string image_name;
     int n_samples;
+    float focus_distance;
+    float aperture_size;
 };
 
 struct Light {

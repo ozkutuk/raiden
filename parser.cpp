@@ -83,6 +83,19 @@ void parser::Scene::loadFromXml(const std::string& filepath)
         } else {
             stream << "0" << std::endl;
         }
+        child = element->FirstChildElement("FocusDistance");
+        if (child) {
+            stream << child->GetText() << std::endl;
+        } else {
+            stream << "0" << std::endl; // TODO: 0 may be a valid number for focus
+        }
+        child = element->FirstChildElement("ApertureSize");
+        if (child) {
+            stream << child->GetText() << std::endl;
+        } else {
+            stream << "0" << std::endl; // TODO: 0 may be a valid number for focus
+        }
+
 
         stream >> camera.position.x >> camera.position.y >> camera.position.z;
         stream >> camera.gaze.x >> camera.gaze.y >> camera.gaze.z;
@@ -92,6 +105,8 @@ void parser::Scene::loadFromXml(const std::string& filepath)
         stream >> camera.image_width >> camera.image_height;
         stream >> camera.image_name;
         stream >> camera.n_samples;
+        stream >> camera.focus_distance;
+        stream >> camera.aperture_size;
 
         cameras.push_back(camera);
         element = element->NextSiblingElement("Camera");
