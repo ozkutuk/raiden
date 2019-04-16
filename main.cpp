@@ -29,10 +29,8 @@ struct Color {
     uint8_t b;
 };
 
-struct Light {
-    tmath::vec3f intensity;
-    tmath::vec3f position;
-};
+
+using parser::Light, parser::PointLight, parser::AreaLight; // TODO: reorganize this
 
 inline double mrandom() {
     return ((double)rand() / (RAND_MAX));
@@ -74,7 +72,7 @@ tmath::vec3f to_canonical(const std::tuple<tmath::vec3f, tmath::vec3f, tmath::ve
     return tmath::vec3f(tmath::dot(u, point), tmath::dot(v, point), tmath::dot(w, point));
 }
 
-tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Light> &lights,
+tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<std::unique_ptr<Light>> &lights,
                       const tmath::vec3f &ambient_light, const tmath::vec3f &background,
                       float epsilon, int recursion_depth) {
 
@@ -91,21 +89,19 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
     tmath::vec3f normal = intersected->normal;
     tmath::vec3f to_eye = tmath::normalize(ray.origin - hit_point);
     for (const auto &light : lights) {
-        tmath::vec3f light_intensity = light.intensity;
-        tmath::vec3f light_vec = light.position - hit_point;
+        tmath::vec3f light_intensity = light->intensity;
+        tmath::vec3f light_vec = light->position - hit_point;
         float light_distance;
         tmath::vec3f light_dir;
 
-        const bool area_light = true;
-
-        if (!area_light) {
+        if (light->type == Light::LightType::POINT) {
             // calculate this way, because we can reuse the distance
             light_distance = tmath::length(light_vec);
             light_dir = light_vec / light_distance;
-        } else {
-            const float light_size = 3.0f;
-            const tmath::vec3f light_normal = tmath::vec3f(0.0f, -1.0f, 0.0f);
-            // light_intensity *= light_size * light_size;
+        } else if (light->type == Light::LightType::AREA) {
+            auto area_ptr = static_cast<AreaLight*>(light.get()); // wow this is ugly
+            const float light_size = area_ptr->size;
+            const tmath::vec3f light_normal = area_ptr->normal;
             auto [u, v, w] = orthonormal_basis(light_normal);
 
             float u_offset = -(light_size / 2.0f) + light_size * mrandom();
@@ -116,6 +112,9 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
             light_dir = light_dir / light_distance;
             light_intensity *=
                 std::abs(tmath::dot(light_dir, light_normal)) * light_size * light_size;
+        } else {
+            std::cerr << "Unexpected light type" << std::endl;
+            std::exit(EXIT_FAILURE);
         }
 
         Ray shadow_ray(hit_point + epsilon * normal, light_dir);
@@ -211,7 +210,7 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<Lig
     return total_light;
 }
 
-void render(const BVH &surfaces, const std::vector<Light> &lights,
+void render(const BVH &surfaces, const std::vector<std::unique_ptr<Light>> &lights,
             const tmath::vec3f &ambient_light, const tmath::vec3f &background, float epsilon,
             int max_recursion, const parser::Camera &camera) {
     int image_width = camera.image_width;
@@ -242,7 +241,7 @@ void render(const BVH &surfaces, const std::vector<Light> &lights,
             float su = rl / image_width;
             float sv = tb / image_height;
 
-            const int n_samples = 100;
+            const int n_samples = 1;
             const float bin_dimension = 1.0f / std::sqrt(n_samples);
             tmath::vec3f value;
 
@@ -370,12 +369,22 @@ int main(int argc, char **argv) {
     SurfaceList surfaces(std::move(surface_vector));
     BVH bvh(surfaces.surfaces, Axis::X);
 
-    std::vector<Light> lights;
+    std::vector<std::unique_ptr<Light>> lights;
     for (const auto &light : scene.point_lights) {
-        Light l;
+        PointLight l;
         l.position = light.position;
         l.intensity = light.intensity;
-        lights.emplace_back(l);
+        l.type = Light::LightType::POINT;
+        lights.emplace_back(std::make_unique<PointLight>(l));
+    }
+    for (const auto &light : scene.area_lights) {
+        AreaLight l;
+        l.position = light.position;
+        l.intensity = light.intensity;
+        l.normal = light.normal;
+        l.size = light.size;
+        l.type = Light::LightType::AREA;
+        lights.emplace_back(std::make_unique<AreaLight>(l));
     }
 
     for (const auto &camera : scene.cameras)

@@ -95,20 +95,41 @@ void parser::Scene::loadFromXml(const std::string& filepath)
     auto child = element->FirstChildElement("AmbientLight");
     stream << child->GetText() << std::endl;
     stream >> ambient_light.x >> ambient_light.y >> ambient_light.z;
-    element = element->FirstChildElement("PointLight");
+    auto points = element->FirstChildElement("PointLight");
     PointLight point_light;
-    while (element)
+    while (points)
     {
-        child = element->FirstChildElement("Position");
+        child = points->FirstChildElement("Position");
         stream << child->GetText() << std::endl;
-        child = element->FirstChildElement("Intensity");
+        child = points->FirstChildElement("Intensity");
         stream << child->GetText() << std::endl;
 
         stream >> point_light.position.x >> point_light.position.y >> point_light.position.z;
         stream >> point_light.intensity.x >> point_light.intensity.y >> point_light.intensity.z;
 
         point_lights.push_back(point_light);
-        element = element->NextSiblingElement("PointLight");
+        points = points->NextSiblingElement("PointLight");
+    }
+    auto areas = element->FirstChildElement("AreaLight");
+    AreaLight area_light;
+    while (areas)
+    {
+        child = areas->FirstChildElement("Position");
+        stream << child->GetText() << std::endl;
+        child = areas->FirstChildElement("Radiance");
+        stream << child->GetText() << std::endl;
+        child = areas->FirstChildElement("Normal");
+        stream << child->GetText() << std::endl;
+        child = areas->FirstChildElement("Size");
+        stream << child->GetText() << std::endl;
+
+        stream >> area_light.position.x >> area_light.position.y >> area_light.position.z;
+        stream >> area_light.intensity.x >> area_light.intensity.y >> area_light.intensity.z;
+        stream >> area_light.normal.x >> area_light.normal.y >> area_light.normal.z;
+        stream >> area_light.size;
+
+        area_lights.push_back(area_light);
+        areas = areas->NextSiblingElement("AreaLight");
     }
 
     //Get Materials
