@@ -237,7 +237,9 @@ void render(const BVH &surfaces, const std::vector<std::unique_ptr<Light>> &ligh
 
     std::vector<Color> image(image_width * image_height);
 
+    int n_samples = camera.n_samples;
     srand(time(0));
+
     for (int y = 0; y < image_height; y++) {
         for (int x = 0; x < image_width; x++) {
 
@@ -245,9 +247,8 @@ void render(const BVH &surfaces, const std::vector<std::unique_ptr<Light>> &ligh
             float sv = tb / image_height;
 
             tmath::vec3f value;
-            int n_samples = camera.n_samples;
 
-            if (n_samples) {
+            if (n_samples > 1) {
                 const float bin_dimension = 1.0f / std::sqrt(n_samples);
 
                 bool dof = camera.focus_distance != 0;
@@ -298,9 +299,8 @@ void render(const BVH &surfaces, const std::vector<std::unique_ptr<Light>> &ligh
                 value = tmath::clamp(value / n_samples, 0.0f, 255.0f);
 
             } else {
-
-                su *= (x + 0.5f) / image_width;
-                sv *= (y + 0.5f) / image_height;
+                su *= (x + 0.5f);
+                sv *= (y + 0.5f);
 
                 Ray r(origin, tmath::normalize((top_left + su * right - sv * up) - origin));
                 value = tmath::clamp(cast_ray(r, surfaces, lights, ambient_light, background,

@@ -81,7 +81,7 @@ void parser::Scene::loadFromXml(const std::string& filepath)
         if (child) {
             stream << child->GetText() << std::endl;
         } else {
-            stream << "0" << std::endl;
+            stream << "1" << std::endl;
         }
         child = element->FirstChildElement("FocusDistance");
         if (child) {
@@ -93,7 +93,7 @@ void parser::Scene::loadFromXml(const std::string& filepath)
         if (child) {
             stream << child->GetText() << std::endl;
         } else {
-            stream << "0" << std::endl; // TODO: 0 may be a valid number for focus
+            stream << "0" << std::endl; 
         }
 
 
