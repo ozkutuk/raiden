@@ -55,6 +55,7 @@ struct Material {
     float phong_exponent;
     float refractive_index;
     Vec3f transparency;
+    float roughness;
 };
 
 struct Face {

@@ -29,7 +29,6 @@ struct Color {
     uint8_t b;
 };
 
-
 using parser::Light, parser::PointLight, parser::AreaLight; // TODO: reorganize this
 
 inline double mrandom() {
@@ -72,7 +71,8 @@ tmath::vec3f to_canonical(const std::tuple<tmath::vec3f, tmath::vec3f, tmath::ve
     return tmath::vec3f(tmath::dot(u, point), tmath::dot(v, point), tmath::dot(w, point));
 }
 
-tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<std::unique_ptr<Light>> &lights,
+tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces,
+                      const std::vector<std::unique_ptr<Light>> &lights,
                       const tmath::vec3f &ambient_light, const tmath::vec3f &background,
                       float epsilon, int recursion_depth) {
 
@@ -99,7 +99,7 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<std
             light_distance = tmath::length(light_vec);
             light_dir = light_vec / light_distance;
         } else if (light->type == Light::LightType::AREA) {
-            auto area_ptr = static_cast<AreaLight*>(light.get()); // wow this is ugly
+            auto area_ptr = static_cast<AreaLight *>(light.get()); // wow this is ugly
             const float light_size = area_ptr->size;
             const tmath::vec3f light_normal = area_ptr->normal;
             auto [u, v, w] = orthonormal_basis(light_normal);
@@ -137,9 +137,6 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<std
     total_light += intersected->material->diffuse * diffuse_light_intensity +
                    intersected->material->specular * specular_light_intensity;
 
-    const bool glossy = false;
-    const float blur_window = 0.5f;
-
     if (intersected->material->refractive_index != 0 && recursion_depth > 0) {
         tmath::vec3f dir = -1.0f * to_eye;
         bool outside = tmath::dot(normal, dir) < 0;
@@ -153,7 +150,11 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<std
                       tmath::refract2(dir, normal, intersected->material->refractive_index));
 
         auto reflected_direction = tmath::reflect(-1.0f * to_eye, normal);
+
+        bool glossy = intersected->material->roughness != 0.0f;
         if (glossy) {
+            float blur_window = intersected->material->roughness;
+
             auto [u, v, w] = orthonormal_basis(reflected_direction);
 
             float u_offset = -(blur_window / 2.0f) + blur_window * mrandom();
@@ -188,7 +189,9 @@ tmath::vec3f cast_ray(const Ray &ray, const BVH &surfaces, const std::vector<std
     else if (tmath::length(intersected->material->mirror_reflectance) != 0 && recursion_depth > 0) {
 
         auto reflected_direction = tmath::reflect(-1.0f * to_eye, normal);
+        bool glossy = intersected->material->roughness != 0.0f;
         if (glossy) {
+            float blur_window = intersected->material->roughness;
             auto [u, v, w] = orthonormal_basis(reflected_direction);
 
             float u_offset = -(blur_window / 2.0f) + blur_window * mrandom();
@@ -324,7 +327,8 @@ int main(int argc, char **argv) {
                    scene.materials[sphere.material_id - 1].mirror,
                    scene.materials[sphere.material_id - 1].phong_exponent,
                    scene.materials[sphere.material_id - 1].refractive_index,
-                   scene.materials[sphere.material_id - 1].transparency);
+                   scene.materials[sphere.material_id - 1].transparency,
+                   scene.materials[sphere.material_id - 1].roughness);
         std::shared_ptr<Surface> s = std::make_shared<Sphere>(
             scene.vertex_data[sphere.center_vertex_id - 1], sphere.radius, m);
         surface_vector.emplace_back(std::move(s));
@@ -337,7 +341,8 @@ int main(int argc, char **argv) {
                    scene.materials[triangle.material_id - 1].mirror,
                    scene.materials[triangle.material_id - 1].phong_exponent,
                    scene.materials[triangle.material_id - 1].refractive_index,
-                   scene.materials[triangle.material_id - 1].transparency);
+                   scene.materials[triangle.material_id - 1].transparency,
+                   scene.materials[triangle.material_id - 1].roughness);
         std::shared_ptr<Surface> s =
             std::make_shared<Triangle>(Face(scene.vertex_data[triangle.indices.v0_id - 1],
                                             scene.vertex_data[triangle.indices.v1_id - 1],
@@ -353,7 +358,8 @@ int main(int argc, char **argv) {
                    scene.materials[mesh.material_id - 1].mirror,
                    scene.materials[mesh.material_id - 1].phong_exponent,
                    scene.materials[mesh.material_id - 1].refractive_index,
-                   scene.materials[mesh.material_id - 1].transparency);
+                   scene.materials[mesh.material_id - 1].transparency,
+                   scene.materials[mesh.material_id - 1].roughness);
 
         std::vector<std::shared_ptr<Face>> faces;
         for (const auto &face : mesh.faces) {
