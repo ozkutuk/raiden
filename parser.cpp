@@ -1,7 +1,18 @@
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcatch-value"
+#pragma GCC diagnostic ignored "-Wpedantic"
+#include "happly.h"
+#pragma GCC diagnostic pop
+#else
+#include "happly.h"
+#endif // __GNUC__
+
 #include "parser.h"
 #include "tinyxml2.h"
 #include <cmath>
 #include <iostream>
+#include <filesystem>
 #include <sstream>
 #include <stdexcept>
 
@@ -251,6 +262,7 @@ void parser::Scene::loadFromXml(const std::string &filepath) {
     element = root->FirstChildElement("Objects");
     element = element->FirstChildElement("Mesh");
     Mesh mesh;
+    std::size_t offset = vertex_data.size();
     while (element) {
         child = element->FirstChildElement("Material");
         stream << child->GetText() << std::endl;
@@ -258,11 +270,42 @@ void parser::Scene::loadFromXml(const std::string &filepath) {
 
         child = element->FirstChildElement("Faces");
 
-        auto ply_file = child->Attribute("plyFile");
+        auto ply_filename = child->Attribute("plyFile");
 
-        if (ply_file) {
-            // TODO: import ply
-            std::cerr << "Ply support not yet implemented" << std::endl;
+        if (ply_filename) {
+            std::filesystem::path ply_path = filepath;
+            ply_path = ply_path.parent_path() / std::filesystem::path(ply_filename);
+
+            happly::PLYData ply_file(ply_path);
+            auto vertices = ply_file.getVertexPositions();
+            auto faces = ply_file.getFaceIndices();
+
+            for (const auto & vertex : vertices) {
+                Vec3f v(vertex[0], vertex[1], vertex[2]);
+                vertex_data.emplace_back(v);
+            }
+
+            for (const auto & face : faces) {
+                if (face.size() == 3) { // triangle
+                    Face f = {static_cast<int>(face[0] + offset), 
+                              static_cast<int>(face[1] + offset),
+                              static_cast<int>(face[2] + offset)};
+                    mesh.faces.emplace_back(f);
+
+                } else if (face.size() == 4) { // quad
+                    Face f1 = {static_cast<int>(face[0] + offset), 
+                               static_cast<int>(face[1] + offset),
+                               static_cast<int>(face[2] + offset)};
+                    Face f2 = {static_cast<int>(face[0] + offset), 
+                               static_cast<int>(face[2] + offset),
+                               static_cast<int>(face[3] + offset)};
+                    mesh.faces.emplace_back(f1);
+                    mesh.faces.emplace_back(f2);
+                }
+            }
+
+            offset += vertices.size();
+
         } else {
             stream << child->GetText() << std::endl;
             Face face;
@@ -272,9 +315,9 @@ void parser::Scene::loadFromXml(const std::string &filepath) {
             }
             stream.clear();
 
-            meshes.push_back(mesh);
-            mesh.faces.clear();
         }
+        meshes.push_back(mesh);
+        mesh.faces.clear();
         element = element->NextSiblingElement("Mesh");
     }
     stream.clear();
