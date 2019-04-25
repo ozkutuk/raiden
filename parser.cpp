@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "tinyxml2.h"
+#include <cmath>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -57,56 +58,90 @@ void parser::Scene::loadFromXml(const std::string &filepath) {
         else
             camera_type = "default";
 
+        auto child = element->FirstChildElement("Position");
+        stream << child->GetText() << std::endl;
         if (camera_type == "lookAt") {
-            std::cerr << "lookAt camera not yet implemented" << std::endl;
-        } else {
-            auto child = element->FirstChildElement("Position");
+            child = element->FirstChildElement("GazePoint");
             stream << child->GetText() << std::endl;
+            child = element->FirstChildElement("Up");
+            stream << child->GetText() << std::endl;
+            child = element->FirstChildElement("FovY");
+        } else {
             child = element->FirstChildElement("Gaze");
             stream << child->GetText() << std::endl;
             child = element->FirstChildElement("Up");
             stream << child->GetText() << std::endl;
             child = element->FirstChildElement("NearPlane");
             stream << child->GetText() << std::endl;
-            child = element->FirstChildElement("NearDistance");
-            stream << child->GetText() << std::endl;
-            child = element->FirstChildElement("ImageResolution");
-            stream << child->GetText() << std::endl;
-            child = element->FirstChildElement("ImageName");
-            stream << child->GetText() << std::endl;
-            child = element->FirstChildElement("NumSamples");
-            if (child) {
-                stream << child->GetText() << std::endl;
-            } else {
-                stream << "1" << std::endl;
-            }
-            child = element->FirstChildElement("FocusDistance");
-            if (child) {
-                stream << child->GetText() << std::endl;
-            } else {
-                stream << "0" << std::endl; // TODO: 0 may be a valid number for focus
-            }
-            child = element->FirstChildElement("ApertureSize");
-            if (child) {
-                stream << child->GetText() << std::endl;
-            } else {
-                stream << "0" << std::endl;
-            }
+        }
 
-            stream >> camera.position.x >> camera.position.y >> camera.position.z;
+        child = element->FirstChildElement("NearDistance");
+        stream << child->GetText() << std::endl;
+        child = element->FirstChildElement("ImageResolution");
+        stream << child->GetText() << std::endl;
+        child = element->FirstChildElement("ImageName");
+        stream << child->GetText() << std::endl;
+        child = element->FirstChildElement("NumSamples");
+        if (child) {
+            stream << child->GetText() << std::endl;
+        } else {
+            stream << "1" << std::endl;
+        }
+        child = element->FirstChildElement("FocusDistance");
+        if (child) {
+            stream << child->GetText() << std::endl;
+        } else {
+            stream << "0" << std::endl; // TODO: 0 may be a valid number for focus
+        }
+        child = element->FirstChildElement("ApertureSize");
+        if (child) {
+            stream << child->GetText() << std::endl;
+        } else {
+            stream << "0" << std::endl;
+        }
+
+        stream >> camera.position.x >> camera.position.y >> camera.position.z;
+        if (camera_type == "lookAt") {
+            Vec3f gaze_point;
+            stream >> gaze_point.x >> gaze_point.y >> gaze_point.z;
+            Vec3f gaze_vector = gaze_point - camera.position;
+            camera.gaze = gaze_vector;
+        } else {
             stream >> camera.gaze.x >> camera.gaze.y >> camera.gaze.z;
-            stream >> camera.up.x >> camera.up.y >> camera.up.z;
+        }
+
+        stream >> camera.up.x >> camera.up.y >> camera.up.z;
+
+        if (camera_type == "lookAt") {
+            double fov_y;
+            stream >> fov_y;
+            stream >> camera.near_distance;
+            stream >> camera.image_width >> camera.image_height;
+            const double pi = std::acos(-1);
+            double fov_radians = (pi / 180) * fov_y;
+
+            float plane_x, plane_y;
+            plane_y = camera.near_distance * std::tan(fov_radians / 2);
+            float ratio = static_cast<float>(camera.image_width) / camera.image_height;
+            plane_x = ratio * plane_y;
+
+            camera.near_plane.x = -1 * plane_x;
+            camera.near_plane.y = plane_x;
+            camera.near_plane.z = -1 * plane_y;
+            camera.near_plane.w = plane_y;
+        } else {
             stream >> camera.near_plane.x >> camera.near_plane.y >> camera.near_plane.z >>
                 camera.near_plane.w;
             stream >> camera.near_distance;
             stream >> camera.image_width >> camera.image_height;
-            stream >> camera.image_name;
-            stream >> camera.n_samples;
-            stream >> camera.focus_distance;
-            stream >> camera.aperture_size;
-
-            cameras.push_back(camera);
         }
+        stream >> camera.image_name;
+        stream >> camera.n_samples;
+        stream >> camera.focus_distance;
+        stream >> camera.aperture_size;
+
+        cameras.push_back(camera);
+
         element = element->NextSiblingElement("Camera");
     }
 
