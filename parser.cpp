@@ -263,7 +263,7 @@ void parser::Scene::loadFromXml(const std::string &filepath) {
     element = root->FirstChildElement("Objects");
     element = element->FirstChildElement("Mesh");
     Mesh mesh;
-    std::size_t offset = vertex_data.size();
+    std::size_t offset = vertex_data.size() + 1;
     while (element) {
         mesh.material_id = std::stoi(element->FirstChildElement("Material")->GetText());
 
