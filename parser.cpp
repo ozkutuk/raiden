@@ -77,6 +77,7 @@ void parser::Scene::loadFromXml(const std::string &filepath) {
             child = element->FirstChildElement("Up");
             stream << child->GetText() << std::endl;
             child = element->FirstChildElement("FovY");
+            stream << child->GetText() << std::endl;
         } else {
             child = element->FirstChildElement("Gaze");
             stream << child->GetText() << std::endl;
@@ -264,9 +265,7 @@ void parser::Scene::loadFromXml(const std::string &filepath) {
     Mesh mesh;
     std::size_t offset = vertex_data.size();
     while (element) {
-        child = element->FirstChildElement("Material");
-        stream << child->GetText() << std::endl;
-        stream >> mesh.material_id;
+        mesh.material_id = std::stoi(element->FirstChildElement("Material")->GetText());
 
         child = element->FirstChildElement("Faces");
 
